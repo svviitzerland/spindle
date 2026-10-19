@@ -377,7 +377,7 @@ final class Deck {
         // The tube tapers, as real arms do, and is modelled down -Z so the
         // yaw solver in DeckMetrics stays readable. It stops short of the
         // stylus to leave room for the connector and headshell.
-        let tubeLength: CGFloat = 0.197
+        let tubeLength: CGFloat = 0.193
         let arm = SCNCone(topRadius: 0.0028, bottomRadius: 0.0046, height: tubeLength)
         arm.radialSegmentCount = 32
         arm.firstMaterial = tube
@@ -387,58 +387,50 @@ final class Deck {
         armNode.castsShadow = true
         lift.addChildNode(armNode)
 
-        // Bayonet collar. A headshell does not grow out of the tube; it locks
-        // onto a connector at the end of it, and without that piece the two
-        // parts simply float near each other.
-        let collar = SCNCylinder(radius: 0.0066, height: 0.0170)
+        // Bayonet collar: the connector a headshell locks onto. Barely wider
+        // than the tube it joins. An earlier attempt made it half again as
+        // thick as this and it read as a swelling in the arm rather than a
+        // fitting on the end of it.
+        let collar = SCNCylinder(radius: 0.0042, height: 0.0135)
         collar.radialSegmentCount = 28
         collar.firstMaterial = housing
         let collarNode = SCNNode(geometry: collar)
         collarNode.eulerAngles = SCNVector3(-CGFloat.pi / 2, 0, 0)
-        collarNode.position = SCNVector3(0, -0.0052, -0.2045)
+        collarNode.position = SCNVector3(0, -0.0047, -0.1995)
         lift.addChildNode(collarNode)
 
-        let lockRing = SCNTorus(ringRadius: 0.0070, pipeRadius: 0.0014)
-        lockRing.ringSegmentCount = 28
-        lockRing.pipeSegmentCount = 10
-        lockRing.firstMaterial = tube
-        let lockNode = SCNNode(geometry: lockRing)
-        lockNode.eulerAngles = SCNVector3(-CGFloat.pi / 2, 0, 0)
-        lockNode.position = SCNVector3(0, -0.0050, -0.1975)
-        lift.addChildNode(lockNode)
-
-        // Headshell plate, sloping down from the collar to the cartridge. Its
-        // rear overlaps the collar and its front overlaps the cartridge, so
-        // the chain from tube to stylus is continuous.
-        let tilt: CGFloat = -0.14
-        let headshell = SCNBox(width: 0.0190, height: 0.0050, length: 0.0300,
-                               chamferRadius: 0.0014)
+        // Headshell plate. It slopes from the collar down to the cartridge in
+        // one run, so the eye follows the arm through to the stylus instead of
+        // meeting a block hanging off the end.
+        let tilt: CGFloat = -0.30
+        let headshell = SCNBox(width: 0.0165, height: 0.0032, length: 0.0340,
+                               chamferRadius: 0.0010)
         headshell.firstMaterial = tube
         let headNode = SCNNode(geometry: headshell)
-        headNode.position = SCNVector3(0, -0.0148, -0.2210)
+        headNode.position = SCNVector3(0, -0.00865, -0.21373)
         headNode.eulerAngles = SCNVector3(tilt, 0, 0)
         lift.addChildNode(headNode)
 
-        let lever = SCNCapsule(capRadius: 0.0013, height: 0.0140)
+        let lever = SCNCapsule(capRadius: 0.0012, height: 0.0125)
         lever.firstMaterial = tube
         let leverNode = SCNNode(geometry: lever)
-        leverNode.position = SCNVector3(0.0098, -0.0120, -0.2125)
-        leverNode.eulerAngles = SCNVector3(0.28, 0, 0.55)
+        leverNode.position = SCNVector3(0.0084, -0.0070, -0.2070)
+        leverNode.eulerAngles = SCNVector3(0.30, 0, 0.60)
         lift.addChildNode(leverNode)
 
-        let cartridge = SCNBox(width: 0.0134, height: 0.0094, length: 0.0184,
-                               chamferRadius: 0.0014)
+        let cartridge = SCNBox(width: 0.0118, height: 0.0115, length: 0.0150,
+                               chamferRadius: 0.0011)
         cartridge.firstMaterial = Materials.plastic(RGB(0.145, 0.032, 0.034),
                                                     gloss: 0.72, seed: 91)
         let cartridgeNode = SCNNode(geometry: cartridge)
-        cartridgeNode.position = SCNVector3(0, -0.0220, -0.2290)
+        cartridgeNode.position = SCNVector3(0, -0.02095, -0.2295)
         cartridgeNode.eulerAngles = SCNVector3(tilt, 0, 0)
         lift.addChildNode(cartridgeNode)
 
         // The stylus has to actually touch the record. Its tip sits on the
         // playing surface, and the position follows from the arm length
-        // rather than being eyeballed: it used to hover 2.6 mm clear.
-        let stylus = SCNCone(topRadius: 0.0010, bottomRadius: 0.00008, height: 0.0062)
+        // rather than being eyeballed.
+        let stylus = SCNCone(topRadius: 0.0009, bottomRadius: 0.00008, height: 0.0062)
         stylus.firstMaterial = tube
         let stylusNode = SCNNode(geometry: stylus)
         stylusNode.position = SCNVector3(0, DeckMetrics.stylusHeightInArm,
