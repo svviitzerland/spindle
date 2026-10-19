@@ -24,7 +24,7 @@ final class PreferencesWindowController: NSWindowController {
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = NSColor(srgbRed: 0.063, green: 0.059, blue: 0.055, alpha: 1)
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: Theme.windowWidth, height: 622))
+        window.setContentSize(NSSize(width: Theme.windowWidth, height: 670))
         window.center()
         self.init(window: window)
     }
@@ -344,6 +344,11 @@ private struct SceneCard: View {
 private struct SettingsCard: View {
     @ObservedObject var preferences: Preferences
 
+    /// Read when the window opens rather than continuously: a json dropped in
+    /// the folder should show up, but not at the cost of hitting the disk on
+    /// every redraw.
+    @State private var pressings: [Pressing] = PressingLibrary.builtIn()
+
     /// Reads and writes the login-item service directly, so the checkbox can
     /// never drift from what macOS actually registered.
     private var launchAtLogin: Binding<Bool> {
@@ -354,6 +359,28 @@ private struct SettingsCard: View {
     var body: some View {
         Card(padding: 0) {
             VStack(spacing: 0) {
+                Row(icon: "record.circle", title: "Pressing") {
+                    HStack(spacing: 7) {
+                        Picker("", selection: $preferences.pressingID) {
+                            ForEach(pressings) { pressing in
+                                Text(pressing.name).tag(pressing.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 142)
+
+                        Button {
+                            guard let url = try? PressingLibrary.directory() else { return }
+                            NSWorkspace.shared.open(url)
+                        } label: {
+                            Image(systemName: "folder")
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(Theme.faint)
+                        .help("Add your own records here")
+                    }
+                }
+
                 Row(icon: "textformat", title: "Show track on desktop") {
                     Toggle("", isOn: $preferences.showTrackInfo).labelsHidden()
                 }
@@ -375,6 +402,14 @@ private struct SettingsCard: View {
         }
         .toggleStyle(.switch)
         .tint(Theme.accent)
+        .onAppear {
+            pressings = PressingLibrary.all()
+            // A record that has since been deleted would otherwise leave the
+            // picker showing nothing at all.
+            if !pressings.contains(where: { $0.id == preferences.pressingID }) {
+                preferences.pressingID = Pressing.black.id
+            }
+        }
     }
 }
 

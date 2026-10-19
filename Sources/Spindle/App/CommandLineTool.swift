@@ -20,6 +20,7 @@ enum CommandLineTool {
       --scene <id>      daylight | lamplight | overhead
       --size <WxH>      default 2560x1440
       --seed <text>     changes the generated sleeve art
+      --pressing <id>   black | clear | ruby | sea-glass | bone | ember
       --progress <0-1>  where the stylus sits in the side
       --out <path>      default ./spindle-<scene>.png
     """
@@ -70,12 +71,14 @@ enum CommandLineTool {
 
         let progress = Double(options["progress"] ?? "") ?? 0.28
         let seed = options["seed"] ?? "spindle"
+        let pressing = PressingLibrary.pressing(id: options["pressing"] ?? Pressing.black.id)
         let outPath = options["out"] ?? "spindle-\(preset.id).png"
         let url = URL(fileURLWithPath: (outPath as NSString).expandingTildeInPath)
 
         do {
             let image = try StillRenderer.render(preset: preset, size: size,
-                                                 seed: seed, progress: progress)
+                                                 seed: seed, pressing: pressing,
+                                                 progress: progress)
             try StillRenderer.writePNG(image, to: url)
             print("\(Int(size.width))x\(Int(size.height))  \(preset.name)  →  \(url.path)")
             return 0

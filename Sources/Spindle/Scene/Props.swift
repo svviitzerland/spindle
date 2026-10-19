@@ -10,6 +10,7 @@ import SceneKit
 struct Props {
 
     let preset: ScenePreset
+    var pressing: Pressing = .black
 
     // MARK: Record sleeve
 
@@ -35,8 +36,8 @@ struct Props {
         // The record itself, slid part way out of the open edge.
         let inner = SCNCylinder(radius: 0.1495, height: 0.0016)
         inner.radialSegmentCount = 80
-        let vinyl = Materials.vinyl()
-        inner.materials = [Materials.plastic(RGB(0.03, 0.028, 0.032), gloss: 0.5), vinyl, vinyl]
+        let vinyl = Materials.vinyl(pressing)
+        inner.materials = [Materials.vinylEdge(pressing), vinyl, vinyl]
         let innerNode = SCNNode(geometry: inner)
         innerNode.eulerAngles = SCNVector3(CGFloat.pi / 2, 0, 0)
         innerNode.position = SCNVector3(0.055, 0.012, -0.005)
@@ -58,13 +59,13 @@ struct Props {
         let stack = SCNNode()
         // A 12-inch record is 1.9 mm and its sleeve is card, so a filled
         // sleeve is about 5 mm. Anything more and the pile reads as plywood.
-        let thickness: CGFloat = 0.0048
+        let thickness: CGFloat = 0.0032
         let topCover = Materials.paperboard(
             GenerativeCover.make(seed: "stack").image, seed: 711)
 
         for i in 0..<4 {
             let sleeve = SCNBox(width: 0.315, height: thickness, length: 0.315,
-                                chamferRadius: 0.0009)
+                                chamferRadius: 0.0005)
             let card = Materials.paperboard(
                 Textures.solid(RGB(0.055 + CGFloat(i) * 0.02,
                                    0.052 + CGFloat(i) * 0.02,

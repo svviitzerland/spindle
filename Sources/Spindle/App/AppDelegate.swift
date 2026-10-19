@@ -14,6 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables: Set<AnyCancellable> = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Explain the Records format in the folder itself, where whoever
+        // opens it will actually read it.
+        PressingLibrary.installGuideIfNeeded()
         buildStatusItem()
         controller.onPermissionDenied = { [weak self] source in
             self?.presentAutomationHelp(for: source)
@@ -79,6 +82,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
+        let recordsItem = NSMenuItem(title: "Open Records Folder…",
+                                     action: #selector(openRecordsFolder),
+                                     keyEquivalent: "")
+        recordsItem.target = self
+        menu.addItem(recordsItem)
+
         let settingsItem = NSMenuItem(title: "Settings…",
                                       action: #selector(openPreferences),
                                       keyEquivalent: ",")
@@ -98,6 +107,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func selectScene(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
         preferences.sceneID = id
+    }
+
+    @objc private func openRecordsFolder() {
+        guard let url = try? PressingLibrary.directory() else { return }
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func openPreferences() {

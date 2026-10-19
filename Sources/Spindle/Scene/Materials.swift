@@ -276,8 +276,9 @@ enum Materials {
 
     /// The record. Grooves in the normal map, plus the fine radial scratching
     /// and dust that every played record carries.
-    static func vinyl() -> SCNMaterial {
-        let diffuse = cached("vinyl-d") { Textures.vinylDiffuse() }
+    static func vinyl(_ pressing: Pressing = .black) -> SCNMaterial {
+        let key = "vinyl-\(pressing.id)-\(pressing.color)-\(pressing.translucent)"
+        let diffuse = cached(key) { Textures.vinylDiffuse(pressing: pressing) }
         let normal = cached("vinyl-n") { Textures.vinylNormal() }
         let roughness = cached("vinyl-r") { Textures.vinylRoughness() }
         return pbr { m in
@@ -290,6 +291,12 @@ enum Materials {
             m.clearCoat.contents = 0.9
             m.clearCoatRoughness.contents = 0.06
         }
+    }
+
+    /// The rim of the disc, which is seen edge on and so needs no groove map.
+    static func vinylEdge(_ pressing: Pressing = .black) -> SCNMaterial {
+        plastic(pressing.color.scaled(0.9), gloss: 0.55,
+                seed: UInt64(abs(pressing.id.hashValue % 1000)))
     }
 
     // MARK: Glazed and glass

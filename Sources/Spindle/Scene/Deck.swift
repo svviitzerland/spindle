@@ -65,10 +65,15 @@ final class Deck {
     let labelMaterial: SCNMaterial
 
     private let preset: ScenePreset
+    private let pressing: Pressing
 
-    init(preset: ScenePreset, artwork: NSImage) {
+    init(preset: ScenePreset, artwork: NSImage, pressing: Pressing = .black) {
         self.preset = preset
-        labelMaterial = Materials.paperboard(artwork, seed: 3131)
+        self.pressing = pressing
+        // A pressing with its own label art is meant to be looked at rather
+        // than listened to, so it wins over the album cover.
+        let labelArt = pressing.labelImage.flatMap(NSImage.init(contentsOf:)) ?? artwork
+        labelMaterial = Materials.paperboard(labelArt, seed: 3131)
 
         addFeet()
         addPlinth()
@@ -190,8 +195,8 @@ final class Deck {
                                        DeckMetrics.spindle.y)
         node.addChildNode(spinNode)
 
-        let vinyl = Materials.vinyl()
-        let edge = Materials.plastic(RGB(0.028, 0.026, 0.030), gloss: 0.55, seed: 78)
+        let vinyl = Materials.vinyl(pressing)
+        let edge = Materials.vinylEdge(pressing)
 
         let record = SCNCylinder(radius: DeckMetrics.recordRadius,
                                  height: DeckMetrics.recordThickness)

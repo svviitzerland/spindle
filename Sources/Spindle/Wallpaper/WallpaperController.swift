@@ -25,7 +25,9 @@ final class WallpaperController {
     init(preferences: Preferences = .shared, nowPlaying: NowPlayingStore) {
         self.preferences = preferences
         self.nowPlaying = nowPlaying
-        self.turntable = TurntableScene(preset: preferences.preset, seed: Preferences.Fixed.sleeveSeed)
+        self.turntable = TurntableScene(preset: preferences.preset,
+                                        seed: Preferences.Fixed.sleeveSeed,
+                                        pressing: preferences.pressing)
     }
 
     // MARK: Lifecycle
@@ -75,7 +77,7 @@ final class WallpaperController {
             lockScreen.restore()
             return
         }
-        lockScreen.apply(preset: preferences.preset)
+        lockScreen.apply(preset: preferences.preset, pressing: preferences.pressing)
     }
 
     func stop() {
@@ -123,6 +125,16 @@ final class WallpaperController {
             .sink { [weak self] id in
                 guard let self else { return }
                 self.turntable.apply(ScenePreset.preset(id: id))
+                self.refreshLockScreen()
+            }
+            .store(in: &cancellables)
+
+        preferences.$pressingID
+            .dropFirst()
+            .sink { [weak self] id in
+                guard let self else { return }
+                self.turntable.apply(PressingLibrary.pressing(id: id))
+                self.turntable.setArtwork(self.currentArtwork)
                 self.refreshLockScreen()
             }
             .store(in: &cancellables)

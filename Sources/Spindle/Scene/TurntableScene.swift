@@ -20,14 +20,18 @@ final class TurntableScene {
     private let lookTarget = SCNNode()
 
     private var deck: Deck
+    private var pressing: Pressing
     private var artwork: NSImage
     private var isSpinning = false
     private var rpm: CGFloat = 33 + 1.0 / 3.0
 
-    init(preset: ScenePreset = .daylight, seed: String = "spindle") {
+    init(preset: ScenePreset = .daylight,
+         seed: String = "spindle",
+         pressing: Pressing = .black) {
         self.preset = preset
+        self.pressing = pressing
         self.artwork = GenerativeCover.make(seed: seed).image
-        self.deck = Deck(preset: preset, artwork: artwork)
+        self.deck = Deck(preset: preset, artwork: artwork, pressing: pressing)
 
         scene.rootNode.addChildNode(world)
         scene.rootNode.addChildNode(lookTarget)
@@ -43,6 +47,17 @@ final class TurntableScene {
     func apply(_ newPreset: ScenePreset) {
         guard newPreset.id != preset.id else { return }
         preset = newPreset
+        rebuild()
+    }
+
+    /// Change what the record is made of.
+    func apply(_ newPressing: Pressing) {
+        guard newPressing != pressing else { return }
+        pressing = newPressing
+        rebuild()
+    }
+
+    private func rebuild() {
         build()
         setArtwork(artwork)
         setSpinning(isSpinning)
@@ -122,7 +137,7 @@ final class TurntableScene {
         addLights()
         addRoom()
 
-        deck = Deck(preset: preset, artwork: artwork)
+        deck = Deck(preset: preset, artwork: artwork, pressing: pressing)
         world.addChildNode(deck.node)
 
         addDressing()
@@ -294,7 +309,7 @@ final class TurntableScene {
 
     private func addDressing() {
         let dressing = preset.dressing
-        let props = Props(preset: preset)
+        let props = Props(preset: preset, pressing: pressing)
 
         if dressing.sleeve {
             let sleeve = props.sleeve(artwork: artwork)

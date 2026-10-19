@@ -33,7 +33,8 @@ final class LockScreenBackground {
     /// Render `preset` at each display's native resolution and set it as that
     /// display's wallpaper. Rendering is slow enough to matter at 5K, so it
     /// happens off the main thread.
-    func apply(preset: ScenePreset, completion: ((Error?) -> Void)? = nil) {
+    func apply(preset: ScenePreset, pressing: Pressing = .black,
+               completion: ((Error?) -> Void)? = nil) {
         let displays = NSScreen.screens.map {
             (screen: $0, id: Self.displayID(for: $0), pixels: Self.pixelSize(of: $0))
         }
@@ -47,6 +48,7 @@ final class LockScreenBackground {
             for display in displays {
                 do {
                     let url = try self.renderFile(preset: preset,
+                                                  pressing: pressing,
                                                   pixels: display.pixels,
                                                   displayID: display.id)
                     rendered[display.id] = url
@@ -111,10 +113,12 @@ final class LockScreenBackground {
 
     // MARK: Files
 
-    private func renderFile(preset: ScenePreset, pixels: CGSize, displayID: String) throws -> URL {
+    private func renderFile(preset: ScenePreset, pressing: Pressing,
+                            pixels: CGSize, displayID: String) throws -> URL {
         let image = try StillRenderer.render(preset: preset,
                                              size: pixels,
-                                             seed: Preferences.Fixed.sleeveSeed)
+                                             seed: Preferences.Fixed.sleeveSeed,
+                                             pressing: pressing)
         // A fresh filename every time: macOS caches the wallpaper by path, so
         // overwriting one in place does not always take effect.
         let name = "\(preset.id)-\(displayID)-\(Int(Date().timeIntervalSince1970)).png"

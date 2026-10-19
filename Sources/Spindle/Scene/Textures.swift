@@ -263,17 +263,30 @@ enum Textures {
 
     // MARK: - Vinyl
 
-    /// Near-black lacquer. Barely varies — the grooves do the talking.
-    static func vinylDiffuse(size: Int = 512) -> CGImage {
+    /// The vinyl compound itself.
+    ///
+    /// Translucent stock lightens toward the rim, where the disc is thinnest
+    /// and light carries through it. That gradient is most of what separates
+    /// clear vinyl from grey plastic.
+    static func vinylDiffuse(pressing: Pressing = .black, size: Int = 512) -> CGImage {
         let n = Noise(seed: 42)
+        let red = Double(pressing.color.r)
+        let green = Double(pressing.color.g)
+        let blue = Double(pressing.color.b)
+        let translucent = pressing.translucent
+
         return image(width: size, height: size) { u, v in
-            let dx = u - 0.5, dy = v - 0.5
-            let r = sqrt(dx * dx + dy * dy) * 2
+            let dx: Double = u - 0.5, dy: Double = v - 0.5
+            let r: Double = (dx * dx + dy * dy).squareRoot() * 2
             guard r <= 1.02 else { return (0, 0, 0, 0) }
+
             // Pressing marks: very faint, very fine.
-            let speck = n.value(u * 900, v * 900) * 0.012
-            let base = 0.030 + speck + (r > 0.96 ? 0.02 : 0)
-            return (base, base * 0.98, base * 1.06, 1)
+            let speck: Double = n.value(u * 900, v * 900) * 0.012
+            let carry: Double = translucent ? pow(r, 3.0) * 0.55 : 0
+            let gain: Double = 1.0 + speck * 6.0 + carry
+            let edge: Double = r > 0.96 ? 0.02 : 0
+
+            return (red * gain + edge, green * gain + edge, blue * gain + edge, 1)
         }
     }
 

@@ -25,11 +25,12 @@ enum StillRenderer {
                        size: CGSize,
                        seed: String = "spindle",
                        artwork: NSImage? = nil,
+                       pressing: Pressing = .black,
                        progress: Double = 0.28,
                        atTime time: TimeInterval = 2.0) throws -> NSImage {
         guard let device = MTLCreateSystemDefaultDevice() else { throw Failure.noMetalDevice }
 
-        let turntable = TurntableScene(preset: preset, seed: seed)
+        let turntable = TurntableScene(preset: preset, seed: seed, pressing: pressing)
         if let artwork { turntable.setArtwork(artwork) }
         turntable.setProgress(progress, animated: false)
 

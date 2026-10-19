@@ -26,6 +26,7 @@ final class Preferences: ObservableObject {
         static let spinWhenPaused = "spinWhenPaused"
         static let showTrackInfo = "showTrackInfo"
         static let lockScreen = "lockScreenBackground"
+        static let pressing = "pressing"
     }
 
     private let defaults: UserDefaults
@@ -47,7 +48,12 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(lockScreenBackground, forKey: Key.lockScreen) }
     }
 
+    /// Which record is on the platter. Resolved every time rather than
+    /// cached, so a json dropped in the Records folder is picked up.
+    @Published var pressingID: String { didSet { defaults.set(pressingID, forKey: Key.pressing) } }
+
     var preset: ScenePreset { ScenePreset.preset(id: sceneID) }
+    var pressing: Pressing { PressingLibrary.pressing(id: pressingID) }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -55,6 +61,7 @@ final class Preferences: ObservableObject {
         spinWhenPaused = defaults.object(forKey: Key.spinWhenPaused) as? Bool ?? false
         showTrackInfo = defaults.object(forKey: Key.showTrackInfo) as? Bool ?? true
         lockScreenBackground = defaults.object(forKey: Key.lockScreen) as? Bool ?? false
+        pressingID = defaults.string(forKey: Key.pressing) ?? Pressing.black.id
     }
 
     // MARK: Launch at login
