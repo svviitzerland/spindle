@@ -167,7 +167,13 @@ final class WallpaperController {
     private func apply(_ playing: NowPlaying?) {
         if let playing {
             turntable.setSpinning(playing.isPlaying || preferences.spinWhenPaused)
-            turntable.setProgress(playing.interpolatedProgress())
+            if playing.isPlaying {
+                turntable.setProgress(playing.interpolatedProgress())
+            } else {
+                // Paused: lift the stylus and swing it clear, rather than
+                // leaving it sitting in a groove that is not moving.
+                turntable.parkTonearm()
+            }
         } else {
             // Nothing playing: show the generated sleeve and park the arm.
             let generated = GenerativeCover.make(seed: Preferences.Fixed.sleeveSeed).image

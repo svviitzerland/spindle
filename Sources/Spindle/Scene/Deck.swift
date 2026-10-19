@@ -34,6 +34,26 @@ enum DeckMetrics {
     static let recordBottom = platterTop + slipmatThickness
     static let recordTop = recordBottom + recordThickness
 
+    /// Where the stylus sits when the arm is off the record.
+    static let parkRadius: CGFloat = recordRadius + 0.055
+
+    /// Where the arm comes to rest on the deck.
+    ///
+    /// Derived from the park angle rather than placed by hand, so the cradle
+    /// and the arm cannot disagree. They did: the rest was sitting 14 cm from
+    /// where the arm actually stopped.
+    static var armRestPosition: CGPoint {
+        let yaw = tonearmYaw(forStylusRadius: parkRadius)
+        let stylus = CGPoint(x: pivot.x - armLength * sin(yaw),
+                             y: pivot.y - armLength * cos(yaw))
+        // The cradle takes the tube a little behind the headshell.
+        let dx = stylus.x - pivot.x, dz = stylus.y - pivot.y
+        let length = (dx * dx + dz * dz).squareRoot()
+        let behind: CGFloat = 0.032
+        return CGPoint(x: stylus.x - dx / length * behind,
+                       y: stylus.y - dz / length * behind)
+    }
+
     /// Solve the pivot angle that lands the stylus `radius` from the spindle.
     ///
     /// Pivot, spindle and stylus form a triangle with two known sides, so the
@@ -62,6 +82,9 @@ final class Deck {
     let spinNode = SCNNode()
     /// Carries the whole arm assembly; its yaw is the tracking angle.
     let tonearmPivot = SCNNode()
+    /// Child of the pivot, rotating about the horizontal bearing. This is the
+    /// cueing lift: raising it takes the stylus off the record.
+    let tonearmLift = SCNNode()
     let labelMaterial: SCNMaterial
 
     private let preset: ScenePreset
@@ -249,151 +272,270 @@ final class Deck {
     // MARK: Tonearm
 
     private func addTonearm() {
-        let metal = Materials.machinedMetal(tint: preset.metal, roughness: 0.15)
-        let dark = Materials.plastic(RGB(0.055, 0.053, 0.056), gloss: 0.42)
+        // Three materials, not one. A real arm is polished tube, darker
+        // machined housings and a near-black counterweight, and that contrast
+        // is most of what stops an assembly of cylinders reading as a toy.
+        let tube = Materials.machinedMetal(tint: preset.metal, roughness: 0.11)
+        let housing = Materials.machinedMetal(tint: preset.metal.scaled(0.52), roughness: 0.30)
+        let dark = Materials.plastic(RGB(0.048, 0.046, 0.050), gloss: 0.55)
         let base = DeckMetrics.plinthTop
 
-        // Pivot tower, built as a stack rather than one cylinder so it reads
-        // as machined parts bolted together.
-        let collar = SCNCylinder(radius: 0.0215, height: 0.006)
-        collar.radialSegmentCount = 40
-        collar.firstMaterial = metal
+        // Pivot tower, stepped: a wide polished collar, a plain post, then the
+        // bearing housing. One cylinder reads as a peg; three read as a part.
+        let collar = SCNCylinder(radius: 0.0228, height: 0.0045)
+        collar.radialSegmentCount = 48
+        collar.firstMaterial = tube
         let collarNode = SCNNode(geometry: collar)
-        collarNode.position = SCNVector3(DeckMetrics.pivot.x, base + 0.003, DeckMetrics.pivot.y)
+        collarNode.position = SCNVector3(DeckMetrics.pivot.x, base + 0.0022, DeckMetrics.pivot.y)
         node.addChildNode(collarNode)
 
-        let post = SCNCylinder(radius: 0.0135, height: 0.046)
+        let post = SCNCylinder(radius: 0.0124, height: 0.030)
         post.radialSegmentCount = 36
-        post.firstMaterial = dark
+        post.firstMaterial = housing
         let postNode = SCNNode(geometry: post)
-        postNode.position = SCNVector3(DeckMetrics.pivot.x, base + 0.029, DeckMetrics.pivot.y)
+        postNode.position = SCNVector3(DeckMetrics.pivot.x, base + 0.0195, DeckMetrics.pivot.y)
         node.addChildNode(postNode)
 
-        // Everything beyond here turns with the arm.
-        tonearmPivot.position = SCNVector3(DeckMetrics.pivot.x, base + 0.055, DeckMetrics.pivot.y)
+        let bearingHousing = SCNCylinder(radius: 0.0162, height: 0.0150)
+        bearingHousing.radialSegmentCount = 44
+        bearingHousing.firstMaterial = tube
+        let housingNode = SCNNode(geometry: bearingHousing)
+        housingNode.position = SCNVector3(DeckMetrics.pivot.x, base + 0.0420, DeckMetrics.pivot.y)
+        node.addChildNode(housingNode)
+
+        // Everything beyond here swings with the arm.
+        tonearmPivot.position = SCNVector3(DeckMetrics.pivot.x, base + 0.0560, DeckMetrics.pivot.y)
         node.addChildNode(tonearmPivot)
 
-        let gimbal = SCNBox(width: 0.026, height: 0.020, length: 0.024, chamferRadius: 0.004)
-        gimbal.firstMaterial = metal
-        tonearmPivot.addChildNode(SCNNode(geometry: gimbal))
+        // Gimbal: two cheeks carrying a horizontal bearing, with a visible cap
+        // on each side. This is the joint the arm actually pivots on, so it
+        // has to look like a joint.
+        for side in [-1.0, 1.0] as [CGFloat] {
+            let cheek = SCNBox(width: 0.0042, height: 0.0175, length: 0.0135,
+                               chamferRadius: 0.0012)
+            cheek.firstMaterial = housing
+            let cheekNode = SCNNode(geometry: cheek)
+            cheekNode.position = SCNVector3(side * 0.0098, 0.0015, 0)
+            tonearmPivot.addChildNode(cheekNode)
 
-        let yoke = SCNCylinder(radius: 0.0062, height: 0.034)
-        yoke.firstMaterial = metal
-        let yokeNode = SCNNode(geometry: yoke)
-        yokeNode.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2)
-        tonearmPivot.addChildNode(yokeNode)
+            let cap = SCNCylinder(radius: 0.0046, height: 0.0030)
+            cap.radialSegmentCount = 24
+            cap.firstMaterial = tube
+            let capNode = SCNNode(geometry: cap)
+            capNode.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2)
+            capNode.position = SCNVector3(side * 0.0128, 0.0015, 0)
+            tonearmPivot.addChildNode(capNode)
+        }
 
-        // The tube tapers, as real arms do. Modelled down -Z so the yaw solver
-        // in DeckMetrics stays readable.
-        let tube = SCNCone(topRadius: 0.0030, bottomRadius: 0.0050,
-                           height: DeckMetrics.armLength)
-        tube.radialSegmentCount = 28
-        tube.firstMaterial = metal
-        let tubeNode = SCNNode(geometry: tube)
-        tubeNode.eulerAngles = SCNVector3(-CGFloat.pi / 2, 0, 0)
-        tubeNode.position = SCNVector3(0, -0.0045, -DeckMetrics.armLength / 2)
-        tubeNode.castsShadow = true
-        tonearmPivot.addChildNode(tubeNode)
+        let axle = SCNCylinder(radius: 0.0026, height: 0.0210)
+        axle.radialSegmentCount = 20
+        axle.firstMaterial = tube
+        let axleNode = SCNNode(geometry: axle)
+        axleNode.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2)
+        axleNode.position = SCNVector3(0, 0.0015, 0)
+        tonearmPivot.addChildNode(axleNode)
 
-        // Headshell, cartridge, stylus and finger lift.
-        let headshell = SCNBox(width: 0.0195, height: 0.0085, length: 0.030, chamferRadius: 0.0022)
-        headshell.firstMaterial = metal
+        // The arm proper hangs off the horizontal bearing, so cueing it up
+        // rotates this node rather than moving parts individually.
+        tonearmLift.position = SCNVector3(0, 0.0015, 0)
+        tonearmPivot.addChildNode(tonearmLift)
+
+        addArmTube(to: tonearmLift, tube: tube, dark: dark, housing: housing)
+        addArmRest(base: base, tube: tube, dark: dark, housing: housing)
+        addAntiSkate(base: base, tube: tube, housing: housing)
+        addCueingLever(base: base, tube: tube, dark: dark)
+    }
+
+    /// Tube, headshell and counterweight: everything that lifts when you cue.
+    private func addArmTube(to lift: SCNNode, tube: SCNMaterial,
+                            dark: SCNMaterial, housing: SCNMaterial) {
+        // A collar where the tube meets the bearing, so it does not simply
+        // vanish into the gimbal.
+        let shoulder = SCNCylinder(radius: 0.0062, height: 0.0125)
+        shoulder.radialSegmentCount = 24
+        shoulder.firstMaterial = housing
+        let shoulderNode = SCNNode(geometry: shoulder)
+        shoulderNode.eulerAngles = SCNVector3(-CGFloat.pi / 2, 0, 0)
+        shoulderNode.position = SCNVector3(0, -0.0045, -0.0088)
+        lift.addChildNode(shoulderNode)
+
+        // The tube tapers, as real arms do, and is modelled down -Z so the
+        // yaw solver in DeckMetrics stays readable.
+        let arm = SCNCone(topRadius: 0.0028, bottomRadius: 0.0046,
+                          height: DeckMetrics.armLength)
+        arm.radialSegmentCount = 32
+        arm.firstMaterial = tube
+        let armNode = SCNNode(geometry: arm)
+        armNode.eulerAngles = SCNVector3(-CGFloat.pi / 2, 0, 0)
+        armNode.position = SCNVector3(0, -0.0045, -DeckMetrics.armLength / 2)
+        armNode.castsShadow = true
+        lift.addChildNode(armNode)
+
+        // Headshell, angled down to the record, with its finger lift.
+        let headshell = SCNBox(width: 0.0192, height: 0.0082, length: 0.0300,
+                               chamferRadius: 0.0024)
+        headshell.firstMaterial = tube
         let headNode = SCNNode(geometry: headshell)
-        headNode.position = SCNVector3(0, -0.0125, -DeckMetrics.armLength + 0.014)
-        headNode.eulerAngles = SCNVector3(-0.1, 0, 0)
-        tonearmPivot.addChildNode(headNode)
+        headNode.position = SCNVector3(0, -0.0128, -DeckMetrics.armLength + 0.014)
+        headNode.eulerAngles = SCNVector3(-0.10, 0, 0)
+        lift.addChildNode(headNode)
 
-        let cartridge = SCNBox(width: 0.0135, height: 0.0095, length: 0.0185, chamferRadius: 0.0012)
-        cartridge.firstMaterial = Materials.plastic(RGB(0.14, 0.035, 0.035), gloss: 0.6, seed: 91)
+        let lever = SCNCapsule(capRadius: 0.0014, height: 0.0150)
+        lever.firstMaterial = tube
+        let leverNode = SCNNode(geometry: lever)
+        leverNode.position = SCNVector3(0.0108, -0.0098, -DeckMetrics.armLength + 0.0205)
+        leverNode.eulerAngles = SCNVector3(0.30, 0, 0.52)
+        lift.addChildNode(leverNode)
+
+        let cartridge = SCNBox(width: 0.0134, height: 0.0094, length: 0.0184,
+                               chamferRadius: 0.0014)
+        cartridge.firstMaterial = Materials.plastic(RGB(0.145, 0.032, 0.034),
+                                                    gloss: 0.72, seed: 91)
         let cartridgeNode = SCNNode(geometry: cartridge)
-        cartridgeNode.position = SCNVector3(0, -0.0205, -DeckMetrics.armLength + 0.012)
-        cartridgeNode.eulerAngles = SCNVector3(-0.1, 0, 0)
-        tonearmPivot.addChildNode(cartridgeNode)
+        cartridgeNode.position = SCNVector3(0, -0.0206, -DeckMetrics.armLength + 0.012)
+        cartridgeNode.eulerAngles = SCNVector3(-0.10, 0, 0)
+        lift.addChildNode(cartridgeNode)
 
-        let stylus = SCNCone(topRadius: 0.0011, bottomRadius: 0.0001, height: 0.0062)
-        stylus.firstMaterial = metal
+        let stylus = SCNCone(topRadius: 0.0010, bottomRadius: 0.00008, height: 0.0062)
+        stylus.firstMaterial = tube
         let stylusNode = SCNNode(geometry: stylus)
         stylusNode.position = SCNVector3(0, -0.0272, -DeckMetrics.armLength + 0.0045)
-        tonearmPivot.addChildNode(stylusNode)
+        lift.addChildNode(stylusNode)
 
-        // Finger lift: a small tab everyone has grabbed a thousand times.
-        let lift = SCNBox(width: 0.0022, height: 0.012, length: 0.0075, chamferRadius: 0.0008)
-        lift.firstMaterial = metal
-        let liftNode = SCNNode(geometry: lift)
-        liftNode.position = SCNVector3(0.0105, -0.0105, -DeckMetrics.armLength + 0.020)
-        liftNode.eulerAngles = SCNVector3(0, 0, 0.42)
-        tonearmPivot.addChildNode(liftNode)
-
-        // Counterweight and its stub.
-        let stub = SCNCylinder(radius: 0.0036, height: 0.052)
-        stub.firstMaterial = metal
+        // Counterweight, with chamfered ends and a scale band, rather than a
+        // bare cylinder with a ring floating around it.
+        let stub = SCNCylinder(radius: 0.0036, height: 0.0520)
+        stub.radialSegmentCount = 18
+        stub.firstMaterial = tube
         let stubNode = SCNNode(geometry: stub)
         stubNode.eulerAngles = SCNVector3(CGFloat.pi / 2, 0, 0)
-        stubNode.position = SCNVector3(0, 0, 0.026)
-        tonearmPivot.addChildNode(stubNode)
+        stubNode.position = SCNVector3(0, 0, 0.0260)
+        lift.addChildNode(stubNode)
 
-        let weight = SCNCylinder(radius: 0.0182, height: 0.0245)
-        weight.radialSegmentCount = 44
+        let weight = SCNCylinder(radius: 0.0176, height: 0.0218)
+        weight.radialSegmentCount = 48
         weight.firstMaterial = dark
         let weightNode = SCNNode(geometry: weight)
         weightNode.eulerAngles = SCNVector3(CGFloat.pi / 2, 0, 0)
-        weightNode.position = SCNVector3(0, 0, 0.047)
+        weightNode.position = SCNVector3(0, 0, 0.0470)
         weightNode.castsShadow = true
-        tonearmPivot.addChildNode(weightNode)
+        lift.addChildNode(weightNode)
 
-        // Tracking-force dial on the face of the weight.
-        let dial = SCNTorus(ringRadius: 0.0128, pipeRadius: 0.0022)
-        dial.firstMaterial = metal
-        let dialNode = SCNNode(geometry: dial)
-        dialNode.eulerAngles = SCNVector3(CGFloat.pi / 2, 0, 0)
-        dialNode.position = SCNVector3(0, 0, 0.0345)
-        tonearmPivot.addChildNode(dialNode)
+        for offset in [-0.0106, 0.0106] as [CGFloat] {
+            let chamfer = SCNTorus(ringRadius: 0.0168, pipeRadius: 0.0016)
+            chamfer.ringSegmentCount = 48
+            chamfer.pipeSegmentCount = 12
+            chamfer.firstMaterial = dark
+            let chamferNode = SCNNode(geometry: chamfer)
+            chamferNode.eulerAngles = SCNVector3(CGFloat.pi / 2, 0, 0)
+            chamferNode.position = SCNVector3(0, 0, 0.0470 + offset)
+            lift.addChildNode(chamferNode)
+        }
 
-        addArmRestAndControls(base: base, metal: metal, dark: dark)
+        // Tracking-force scale: a bright band set into the weight.
+        let scale = SCNCylinder(radius: 0.0178, height: 0.0042)
+        scale.radialSegmentCount = 48
+        scale.firstMaterial = tube
+        let scaleNode = SCNNode(geometry: scale)
+        scaleNode.eulerAngles = SCNVector3(CGFloat.pi / 2, 0, 0)
+        scaleNode.position = SCNVector3(0, 0, 0.0384)
+        lift.addChildNode(scaleNode)
     }
 
-    /// Anti-skate, cueing lever and the rest — the fittings crowded around the
-    /// pivot that tell you this is a machine and not a prop.
-    private func addArmRestAndControls(base: CGFloat, metal: SCNMaterial, dark: SCNMaterial) {
-        // Anti-skate dial.
-        let antiSkate = SCNCylinder(radius: 0.0088, height: 0.009)
-        antiSkate.radialSegmentCount = 28
-        antiSkate.firstMaterial = metal
-        let antiSkateNode = SCNNode(geometry: antiSkate)
-        antiSkateNode.position = SCNVector3(DeckMetrics.pivot.x + 0.030, base + 0.0045,
-                                            DeckMetrics.pivot.y + 0.012)
-        node.addChildNode(antiSkateNode)
+    /// A cradle the arm actually sits in, plus its clip.
+    private func addArmRest(base: CGFloat, tube: SCNMaterial,
+                            dark: SCNMaterial, housing: SCNMaterial) {
+        let rest = DeckMetrics.armRestPosition
+        let x = rest.x
+        let z = rest.y
 
-        // Cueing lever: post plus the little paddle you actually push.
-        let cuePost = SCNCylinder(radius: 0.0062, height: 0.016)
-        cuePost.firstMaterial = metal
-        let cuePostNode = SCNNode(geometry: cuePost)
-        cuePostNode.position = SCNVector3(DeckMetrics.pivot.x - 0.030, base + 0.008,
-                                          DeckMetrics.pivot.y + 0.026)
-        node.addChildNode(cuePostNode)
+        let plate = SCNCylinder(radius: 0.0108, height: 0.0035)
+        plate.radialSegmentCount = 32
+        plate.firstMaterial = tube
+        let plateNode = SCNNode(geometry: plate)
+        plateNode.position = SCNVector3(x, base + 0.0018, z)
+        node.addChildNode(plateNode)
 
-        let paddle = SCNBox(width: 0.0068, height: 0.0052, length: 0.024, chamferRadius: 0.0018)
+        let stem = SCNCylinder(radius: 0.0044, height: 0.0245)
+        stem.radialSegmentCount = 20
+        stem.firstMaterial = housing
+        let stemNode = SCNNode(geometry: stem)
+        stemNode.position = SCNVector3(x, base + 0.0158, z)
+        node.addChildNode(stemNode)
+
+        // Two uprights with a gap: the arm drops between them, which is what
+        // makes it read as a rest rather than a block on a stick.
+        for side in [-1.0, 1.0] as [CGFloat] {
+            let jaw = SCNBox(width: 0.0032, height: 0.0120, length: 0.0105,
+                             chamferRadius: 0.0014)
+            jaw.firstMaterial = dark
+            let jawNode = SCNNode(geometry: jaw)
+            jawNode.position = SCNVector3(x + side * 0.0052, base + 0.0335, z)
+            jawNode.eulerAngles = SCNVector3(0, 0, side * 0.16)
+            node.addChildNode(jawNode)
+        }
+
+        let cradle = SCNBox(width: 0.0138, height: 0.0030, length: 0.0105,
+                            chamferRadius: 0.0012)
+        cradle.firstMaterial = dark
+        let cradleNode = SCNNode(geometry: cradle)
+        cradleNode.position = SCNVector3(x, base + 0.0288, z)
+        node.addChildNode(cradleNode)
+    }
+
+    /// Anti-skate: a weighted dial with a slot, not a bare stub.
+    private func addAntiSkate(base: CGFloat, tube: SCNMaterial, housing: SCNMaterial) {
+        let x = DeckMetrics.pivot.x + 0.0315
+        let z = DeckMetrics.pivot.y + 0.0135
+
+        let stem = SCNCylinder(radius: 0.0042, height: 0.0135)
+        stem.radialSegmentCount = 20
+        stem.firstMaterial = housing
+        let stemNode = SCNNode(geometry: stem)
+        stemNode.position = SCNVector3(x, base + 0.0068, z)
+        node.addChildNode(stemNode)
+
+        let dial = SCNCylinder(radius: 0.0092, height: 0.0048)
+        dial.radialSegmentCount = 36
+        dial.firstMaterial = tube
+        let dialNode = SCNNode(geometry: dial)
+        dialNode.position = SCNVector3(x, base + 0.0159, z)
+        node.addChildNode(dialNode)
+
+        let slot = SCNBox(width: 0.0014, height: 0.0008, length: 0.0062, chamferRadius: 0)
+        slot.firstMaterial = Materials.plastic(RGB(0.05, 0.05, 0.05), gloss: 0.2)
+        let slotNode = SCNNode(geometry: slot)
+        slotNode.position = SCNVector3(x, base + 0.0182, z + 0.0012)
+        node.addChildNode(slotNode)
+    }
+
+    /// The lever you push to lower the arm, attached to a base plate so it is
+    /// visibly bolted to the deck.
+    private func addCueingLever(base: CGFloat, tube: SCNMaterial, dark: SCNMaterial) {
+        let x = DeckMetrics.pivot.x - 0.0305
+        let z = DeckMetrics.pivot.y + 0.0265
+
+        let plate = SCNBox(width: 0.0180, height: 0.0032, length: 0.0235,
+                           chamferRadius: 0.0014)
+        plate.firstMaterial = tube
+        let plateNode = SCNNode(geometry: plate)
+        plateNode.position = SCNVector3(x, base + 0.0016, z + 0.0055)
+        node.addChildNode(plateNode)
+
+        let pivotPost = SCNCylinder(radius: 0.0048, height: 0.0125)
+        pivotPost.radialSegmentCount = 20
+        pivotPost.firstMaterial = tube
+        let pivotNode = SCNNode(geometry: pivotPost)
+        pivotNode.position = SCNVector3(x, base + 0.0094, z)
+        node.addChildNode(pivotNode)
+
+        // A capsule, so the end you push is rounded rather than a cut box.
+        let paddle = SCNCapsule(capRadius: 0.0030, height: 0.0265)
         paddle.firstMaterial = dark
         let paddleNode = SCNNode(geometry: paddle)
-        paddleNode.position = SCNVector3(DeckMetrics.pivot.x - 0.030, base + 0.018,
-                                         DeckMetrics.pivot.y + 0.036)
-        paddleNode.eulerAngles = SCNVector3(0.22, 0, 0)
+        paddleNode.position = SCNVector3(x, base + 0.0172, z + 0.0092)
+        paddleNode.eulerAngles = SCNVector3(CGFloat.pi / 2 - 0.26, 0, 0)
         node.addChildNode(paddleNode)
-
-        // Arm rest with its clip.
-        let restPost = SCNCylinder(radius: 0.0048, height: 0.030)
-        restPost.firstMaterial = metal
-        let restNode = SCNNode(geometry: restPost)
-        restNode.position = SCNVector3(DeckMetrics.pivot.x - 0.052, base + 0.015,
-                                       DeckMetrics.pivot.y + 0.090)
-        node.addChildNode(restNode)
-
-        let clip = SCNBox(width: 0.0115, height: 0.0075, length: 0.0115, chamferRadius: 0.0028)
-        clip.firstMaterial = dark
-        let clipNode = SCNNode(geometry: clip)
-        clipNode.position = SCNVector3(DeckMetrics.pivot.x - 0.052, base + 0.0335,
-                                       DeckMetrics.pivot.y + 0.090)
-        node.addChildNode(clipNode)
     }
 
     // MARK: Controls
@@ -407,7 +549,7 @@ final class Deck {
         knob.radialSegmentCount = 44
         knob.firstMaterial = metal
         let knobNode = SCNNode(geometry: knob)
-        knobNode.position = SCNVector3(0.152, base + 0.0058, 0.118)
+        knobNode.position = SCNVector3(0.168, base + 0.0058, 0.138)
         knobNode.castsShadow = true
         node.addChildNode(knobNode)
 
@@ -416,13 +558,13 @@ final class Deck {
         knurl.firstMaterial = Materials.machinedMetal(tint: preset.metal.scaled(0.8),
                                                       roughness: 0.34)
         let knurlNode = SCNNode(geometry: knurl)
-        knurlNode.position = SCNVector3(0.152, base + 0.0058, 0.118)
+        knurlNode.position = SCNVector3(0.168, base + 0.0058, 0.138)
         node.addChildNode(knurlNode)
 
         let mark = SCNBox(width: 0.0016, height: 0.0006, length: 0.0075, chamferRadius: 0)
         mark.firstMaterial = Materials.plastic(RGB(0.06, 0.06, 0.06), gloss: 0.2)
         let markNode = SCNNode(geometry: mark)
-        markNode.position = SCNVector3(0.152, base + 0.0118, 0.1275)
+        markNode.position = SCNVector3(0.168, base + 0.0118, 0.1475)
         node.addChildNode(markNode)
 
         // Power rocker.

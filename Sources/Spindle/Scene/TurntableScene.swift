@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import QuartzCore
 import SceneKit
 
 /// Stages the room: camera, light, desk, deck and dressing.
@@ -23,6 +24,7 @@ final class TurntableScene {
     private var pressing: Pressing
     private var artwork: NSImage
     private var isSpinning = false
+    private var isArmLifted = true
     private var rpm: CGFloat = 33 + 1.0 / 3.0
 
     init(preset: ScenePreset = .daylight,
@@ -99,14 +101,35 @@ final class TurntableScene {
         let t = CGFloat(min(max(progress, 0), 1))
         // Lead-in groove to run-out groove, in metres from the spindle.
         let radius = 0.1430 - t * (0.1430 - 0.0580)
+        setArmLifted(false, animated: animated)
         setTonearmYaw(DeckMetrics.tonearmYaw(forStylusRadius: radius),
                       duration: animated ? 0.9 : 0)
     }
 
-    /// Park the arm on its rest, for when nothing is playing.
+    /// Cue the arm up and swing it back to its rest, the way you would when
+    /// the music stops. The lift leads the swing slightly, because dragging a
+    /// stylus sideways across a record is the one thing you never do.
     func parkTonearm(animated: Bool = true) {
-        setTonearmYaw(DeckMetrics.tonearmYaw(forStylusRadius: DeckMetrics.recordRadius + 0.055),
+        setArmLifted(true, animated: animated)
+        setTonearmYaw(DeckMetrics.tonearmYaw(forStylusRadius: DeckMetrics.parkRadius),
                       duration: animated ? 1.1 : 0)
+    }
+
+    /// Raise or lower the stylus. About two degrees at the bearing, which is
+    /// eight millimetres at the stylus: what a real cueing lever gives you.
+    private func setArmLifted(_ lifted: Bool, animated: Bool) {
+        guard lifted != isArmLifted else { return }
+        isArmLifted = lifted
+        let angle: CGFloat = lifted ? 0.035 : 0
+        guard animated else {
+            deck.tonearmLift.eulerAngles.x = angle
+            return
+        }
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0.45
+        SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        deck.tonearmLift.eulerAngles.x = angle
+        SCNTransaction.commit()
     }
 
     private func setTonearmYaw(_ yaw: CGFloat, duration: TimeInterval) {
@@ -142,6 +165,8 @@ final class TurntableScene {
 
         addDressing()
         addDust()
+        // The deck is new, so the stored lift state no longer describes it.
+        isArmLifted = false
         parkTonearm(animated: false)
     }
 
