@@ -195,41 +195,55 @@ enum Textures {
     /// grain reads as corduroy.
     static func wood(base: RGB, grain: RGB, seed: UInt64 = 7, size: Int = 2048) -> CGImage {
         let n = Noise(seed: seed)
-        let planks = 5.0
+        let planks: Double = 5.0
+        // Every local below is annotated. Swift's type checker has to consider
+        // each numeric literal against every FloatingPoint overload, and in a
+        // closure this dense it gives up — on some toolchains but not others,
+        // which makes it a portability bug rather than a style preference.
+        let baseR = Double(base.r), baseG = Double(base.g), baseB = Double(base.b)
+        let grainR = Double(grain.r), grainG = Double(grain.g), grainB = Double(grain.b)
+
         return image(width: size, height: size / 2) { u, v in
-            let board = floor(v * planks)
-            let localV = v * planks - board
+            let board: Double = floor(v * planks)
+            let localV: Double = v * planks - board
+
             // Per-board character, so no two planks match.
-            let phase = n.value(board * 37.0) * 20.0
-            let spacing = 11.0 + n.value(board * 13.0 + 5.0) * 11.0
-            let warp = n.fbm(u * 2.4, v * 1.6, octaves: 4) - 0.5
+            let phase: Double = n.value(board * 37.0) * 20.0
+            let spacing: Double = 11.0 + n.value(board * 13.0 + 5.0) * 11.0
+            let warp: Double = n.fbm(u * 2.4, v * 1.6, octaves: 4) - 0.5
 
-            // Ring spacing drifts along the board: evenly spaced rings are
-            // the giveaway that wood was generated rather than grown.
-            let drift = n.fbm(localV * 3.0 + board * 11.0, u * 0.8, octaves: 3)
-            let rings = sin((localV * spacing * (0.7 + drift * 0.6)
-                             + phase + warp * 3.0) * .pi)
-            // And every few rings is a latewood band, much darker than the rest.
-            let band = n.value(localV * spacing * 0.5 + board * 23.0)
-            var t = pow(abs(rings), 1.6 + band * 1.6) * (0.55 + band * 0.6)
+            // Ring spacing drifts along the board: evenly spaced rings are the
+            // giveaway that wood was generated rather than grown.
+            let drift: Double = n.fbm(localV * 3.0 + board * 11.0, u * 0.8, octaves: 3)
+            let ringPhase: Double = localV * spacing * (0.7 + drift * 0.6)
+            let rings: Double = sin((ringPhase + phase + warp * 3.0) * Double.pi)
 
-            // Occasional cathedral figure where the saw crossed a knot.
+            // Every few rings is a latewood band, much darker than the rest.
+            let band: Double = n.value(localV * spacing * 0.5 + board * 23.0)
+            let sharpness: Double = 1.6 + band * 1.6
+            let strength: Double = 0.55 + band * 0.6
+            var t: Double = pow(abs(rings), sharpness) * strength
+
             // Cathedral figure, where the saw crossed the grain at an angle.
-            let figure = n.fbm(u * 1.1 + board * 7.0, localV * 1.7, octaves: 4)
+            let figure: Double = n.fbm(u * 1.1 + board * 7.0, localV * 1.7, octaves: 4)
             t += (figure - 0.5) * 0.42
 
-            var r = Double(base.r) + (Double(grain.r) - Double(base.r)) * t
-            var g = Double(base.g) + (Double(grain.g) - Double(base.g)) * t
-            var b = Double(base.b) + (Double(grain.b) - Double(base.b)) * t
+            var r: Double = baseR + (grainR - baseR) * t
+            var g: Double = baseG + (grainG - baseG) * t
+            var b: Double = baseB + (grainB - baseB) * t
 
             // Open pores: short dark ticks running the length of the board.
-            let pore = n.value(u * 520.0, board * 3.0 + localV * 6.0)
-            if pore > 0.74 { r *= 0.78; g *= 0.78; b *= 0.81 }
+            let pore: Double = n.value(u * 520.0, board * 3.0 + localV * 6.0)
+            if pore > 0.74 {
+                r *= 0.78
+                g *= 0.78
+                b *= 0.81
+            }
 
             // The seam between boards.
-            let seam = smooth(min(localV, 1 - localV), 0.0, 0.015)
-            let shade = 0.45 + seam * 0.55
-            return (r * shade, g * shade, b * shade, 1)
+            let seam: Double = smooth(min(localV, 1 - localV), 0.0, 0.015)
+            let shade: Double = 0.45 + seam * 0.55
+            return (r * shade, g * shade, b * shade, 1.0)
         }
     }
 
