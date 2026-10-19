@@ -429,6 +429,36 @@ enum Textures {
         }
     }
 
+    /// Venetian blinds, as seen by a spot light.
+    ///
+    /// Slats run at an angle, because a blind is almost never square to the
+    /// wall you are looking at, and that diagonal banding is what gives a
+    /// plain white room its character.
+    static func blindGobo(slats: Double = 30, tilt: Double = -0.46,
+                          size: Int = 512) -> CGImage {
+        image(width: size, height: size) { u, v in
+            // Rotate the sampling axis, then band along it.
+            let axis: Double = u * sin(tilt) + v * cos(tilt)
+            let band: Double = (axis * slats).truncatingRemainder(dividingBy: 1.0)
+            let distance: Double = abs(band - 0.5)
+
+            // Slats are never all open by the same amount.
+            let index: Double = (axis * slats).rounded(.down)
+            let openness: Double = 0.30 + 0.16 * (0.5 + 0.5 * sin(index * 2.4))
+            let lit: Double = smooth(distance, openness - 0.10, openness + 0.06)
+
+            // Fall off at the edge of the cone so the light does not stop on
+            // a hard circle.
+            let edge: Double = min(min(u, 1 - u), min(v, 1 - v))
+            let frame: Double = smooth(edge, 0.0, 0.16)
+
+            // A lifted floor keeps the shadowed slats grey rather than black,
+            // which is what makes the room read as white.
+            let value: Double = 0.17 + lit * frame * 0.74
+            return (value, value, value, 1)
+        }
+    }
+
     static func smooth(_ x: Double, _ a: Double, _ b: Double) -> Double {
         let t = min(max((x - a) / (b - a), 0), 1)
         return t * t * (3 - 2 * t)

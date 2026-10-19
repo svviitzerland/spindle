@@ -268,11 +268,18 @@ final class TurntableScene {
             light.spotOuterAngle = angle
             light.zNear = 0.05
             light.zFar = 6
-            if spec.window {
+            // What the light arrives through. A bare cone is a stage light;
+            // slats or panes make it a room.
+            switch spec.gobo {
+            case .none:
+                break
+            case .window:
                 light.gobo?.contents = Textures.windowGobo()
-                light.gobo?.wrapS = .clamp
-                light.gobo?.wrapT = .clamp
+            case .blinds:
+                light.gobo?.contents = Textures.blindGobo()
             }
+            light.gobo?.wrapS = .clamp
+            light.gobo?.wrapT = .clamp
         case .omni:
             light.type = .omni
         }
@@ -337,11 +344,24 @@ final class TurntableScene {
         let props = Props(preset: preset, pressing: pressing)
 
         if dressing.sleeve {
-            let sleeve = props.sleeve(artwork: artwork)
+            let sleeve = dressing.sleeveStand
+                ? props.sleeveStand(artwork: artwork)
+                : props.sleeve(artwork: artwork)
             sleeveMaterial = sleeve.material
-            sleeve.node.position = SCNVector3(-0.352, 0.160, -0.165)
-            sleeve.node.eulerAngles = SCNVector3(-0.125, 0.36, 0.02)
+            if dressing.sleeveStand {
+                sleeve.node.position = SCNVector3(-0.368, 0, -0.215)
+                sleeve.node.eulerAngles = SCNVector3(0, 0.10, 0)
+            } else {
+                sleeve.node.position = SCNVector3(-0.352, 0.160, -0.165)
+                sleeve.node.eulerAngles = SCNVector3(-0.125, 0.36, 0.02)
+            }
             world.addChildNode(sleeve.node)
+        }
+        if dressing.leaningFrame {
+            let frame = props.leaningFrame()
+            frame.position = SCNVector3(0.405, 0, -0.282)
+            frame.eulerAngles = SCNVector3(0, -0.16, 0)
+            world.addChildNode(frame)
         }
         if dressing.stack {
             let stack = props.recordStack()

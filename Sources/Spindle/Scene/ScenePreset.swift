@@ -29,8 +29,16 @@ struct ScenePreset: Identifiable, Hashable, Sendable {
         var intensity: CGFloat
         var castsShadow: Bool = true
         var shadowRadius: CGFloat = 12
-        /// Project a window pattern through this light (spot lights only).
-        var window: Bool = false
+        /// What the light arrives through, if anything (spot lights only).
+        var gobo: Gobo = .none
+
+        enum Gobo: Hashable, Sendable {
+            case none
+            /// Panes of daylight.
+            case window
+            /// Venetian slats at an angle.
+            case blinds
+        }
     }
 
     /// What else is in the room. A deck alone on a desk reads as a product
@@ -46,6 +54,10 @@ struct ScenePreset: Identifiable, Hashable, Sendable {
         var plant = false
         var headphones = false
         var books = false
+        /// Show the sleeve on a wooden stand rather than propped on the desk.
+        var sleeveStand = false
+        /// A framed print leaning against the wall.
+        var leaningFrame = false
     }
 
     var id: String
@@ -103,7 +115,7 @@ struct ScenePreset: Identifiable, Hashable, Sendable {
 }
 
 extension ScenePreset {
-    static let all: [ScenePreset] = [daylight, lamplight, overhead]
+    static let all: [ScenePreset] = [daylight, gallery, lamplight, overhead]
 
     static func preset(id: String) -> ScenePreset {
         all.first { $0.id == id } ?? daylight
@@ -124,7 +136,7 @@ extension ScenePreset {
                    position: Vec3(-0.95, 1.05, 0.62),
                    target: Vec3(-0.05, 0.05, -0.05),
                    color: RGB(1.0, 0.955, 0.875),
-                   intensity: 46, shadowRadius: 9, window: true),
+                   intensity: 46, shadowRadius: 9, gobo: .window),
         fill: .init(kind: .area(width: 1.6, height: 1.1),
                     position: Vec3(0.85, 0.62, 0.95),
                     target: Vec3(0, 0.08, 0),
@@ -153,6 +165,54 @@ extension ScenePreset {
                         stack: true, lamp: false, mug: true, plant: true,
                         headphones: false, books: true),
         dustCount: 90, dustColor: RGB(1.0, 0.96, 0.87)
+    )
+
+    /// A white room seen straight on, with the blinds half open. The wall
+    /// does the work here: bare plaster is dull, but plaster with slats
+    /// across it is the whole picture.
+    static let gallery = ScenePreset(
+        id: "gallery",
+        name: "Gallery",
+        tagline: "A white room, a wooden desk, the blinds half open.",
+        cameraPosition: Vec3(0.050, 0.395, 1.640),
+        cameraTarget: Vec3(-0.010, 0.128, -0.020),
+        fieldOfView: 39,
+        fStop: 2.8,
+        roll: -0.008,
+        key: .init(kind: .spot(angle: 110),
+                   position: Vec3(-1.05, 1.08, 0.72),
+                   target: Vec3(-0.10, 0.10, -0.34),
+                   color: RGB(1.0, 0.968, 0.912),
+                   intensity: 64, shadowRadius: 8, gobo: .blinds),
+        fill: .init(kind: .area(width: 1.8, height: 1.2),
+                    position: Vec3(0.92, 0.70, 1.05),
+                    target: Vec3(0, 0.10, 0),
+                    color: RGB(0.88, 0.91, 1.0),
+                    intensity: 420, castsShadow: false),
+        bounce: .init(kind: .area(width: 1.5, height: 1.0),
+                      position: Vec3(0.0, 0.015, 0.45),
+                      target: Vec3(0, 0.26, -0.10),
+                      color: RGB(0.58, 0.44, 0.30),
+                      intensity: 150, castsShadow: false),
+        ambient: RGB(0.95, 0.94, 0.92),
+        ambientIntensity: 12,
+        environmentTint: RGB(1.0, 0.980, 0.950),
+        environmentIntensity: 0.34,
+        exposure: -0.18,
+        vignette: 0.30,
+        bloom: 0.09,
+        wallTop: RGB(0.905, 0.893, 0.872),
+        wallBottom: RGB(0.848, 0.835, 0.813),
+        deskBase: RGB(0.175, 0.108, 0.065),
+        deskGrain: RGB(0.285, 0.185, 0.112),
+        plinth: RGB(0.470, 0.455, 0.425),
+        platter: RGB(0.560, 0.535, 0.485),
+        metal: RGB(0.830, 0.795, 0.720),
+        dressing: .init(wall: true, shelf: false, framedArt: false, sleeve: true,
+                        stack: false, lamp: false, mug: false, plant: false,
+                        headphones: false, books: false,
+                        sleeveStand: true, leaningFrame: true),
+        dustCount: 70, dustColor: RGB(1.0, 0.97, 0.90)
     )
 
     /// Very low, very close, one warm lamp behind the deck so the chrome and

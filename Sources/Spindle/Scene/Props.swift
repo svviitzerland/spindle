@@ -46,6 +46,93 @@ struct Props {
         return Sleeve(node: node, material: material)
     }
 
+    /// A sleeve standing in a shallow wooden cradle.
+    ///
+    /// A record propped straight against a wall always looks like it is about
+    /// to slide. A stand gives it a reason to be upright, and the lip casts a
+    /// line of shadow across the bottom of the cover.
+    func sleeveStand(artwork: NSImage) -> Sleeve {
+        let node = SCNNode()
+        let timber = Materials.varnishedWood(base: preset.deskBase.scaled(1.35),
+                                             grain: preset.deskGrain.scaled(1.35),
+                                             seed: 61)
+
+        let plank = SCNBox(width: 0.368, height: 0.0165, length: 0.088,
+                           chamferRadius: 0.0022)
+        plank.firstMaterial = timber
+        let plankNode = SCNNode(geometry: plank)
+        plankNode.position = SCNVector3(0, 0.00825, 0)
+        plankNode.castsShadow = true
+        node.addChildNode(plankNode)
+
+        // The lip the cover rests against, and a lower rail behind it so the
+        // sleeve sits in a groove rather than on a flat board.
+        let lip = SCNBox(width: 0.368, height: 0.0165, length: 0.0085,
+                         chamferRadius: 0.0016)
+        lip.firstMaterial = timber
+        let lipNode = SCNNode(geometry: lip)
+        lipNode.position = SCNVector3(0, 0.0248, 0.0340)
+        node.addChildNode(lipNode)
+
+        let rail = SCNBox(width: 0.368, height: 0.0105, length: 0.0075,
+                          chamferRadius: 0.0014)
+        rail.firstMaterial = timber
+        let railNode = SCNNode(geometry: rail)
+        railNode.position = SCNVector3(0, 0.0218, -0.0230)
+        node.addChildNode(railNode)
+
+        // The sleeve, reclined into the cradle.
+        let sleeve = self.sleeve(artwork: artwork)
+        sleeve.node.position = SCNVector3(0, 0.1740, 0.0045)
+        sleeve.node.eulerAngles = SCNVector3(-0.115, 0, 0)
+        node.addChildNode(sleeve.node)
+
+        return Sleeve(node: node, material: sleeve.material)
+    }
+
+    /// A framed print standing on the desk, leaning back against the wall.
+    ///
+    /// Hung on the wall it would sit above the top of the frame on a 16:9
+    /// crop. Leaning it on the desk keeps it in shot, and is how prints
+    /// actually end up in a room like this.
+    func leaningFrame() -> SCNNode {
+        let frame = SCNNode()
+        let width: CGFloat = 0.255, height: CGFloat = 0.330, depth: CGFloat = 0.019
+
+        let moulding = SCNBox(width: width, height: height, length: depth,
+                              chamferRadius: 0.0022)
+        moulding.firstMaterial = Materials.varnishedWood(base: RGB(0.215, 0.145, 0.088),
+                                                         grain: RGB(0.330, 0.228, 0.140),
+                                                         seed: 83)
+        let mouldingNode = SCNNode(geometry: moulding)
+        mouldingNode.castsShadow = true
+        frame.addChildNode(mouldingNode)
+
+        // Mount board and print, each stepped forward so the frame has depth.
+        let mount = SCNBox(width: width - 0.030, height: height - 0.030,
+                           length: 0.002, chamferRadius: 0)
+        mount.firstMaterial = Materials.paperboard(Textures.solid(RGB(0.925, 0.915, 0.895)),
+                                                   seed: 84)
+        let mountNode = SCNNode(geometry: mount)
+        mountNode.position = SCNVector3(0, 0, depth / 2 + 0.001)
+        frame.addChildNode(mountNode)
+
+        let print = SCNBox(width: width - 0.088, height: height - 0.112,
+                           length: 0.001, chamferRadius: 0)
+        print.firstMaterial = Materials.paperboard(
+            GenerativeCover.make(seed: "gallery-print", size: 512).image, seed: 85)
+        let printNode = SCNNode(geometry: print)
+        printNode.position = SCNVector3(0, 0.009, depth / 2 + 0.003)
+        frame.addChildNode(printNode)
+
+        // Standing on the desk, tipped back onto the wall.
+        frame.position = SCNVector3(0, height / 2 + 0.002, 0)
+        frame.eulerAngles = SCNVector3(-0.135, 0, 0)
+        let holder = SCNNode()
+        holder.addChildNode(frame)
+        return holder
+    }
+
     // MARK: Record stack
 
     /// Four sleeves dropped on the desk, each a little out of square.
