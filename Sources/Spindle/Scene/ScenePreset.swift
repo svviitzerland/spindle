@@ -96,6 +96,8 @@ struct ScenePreset: Identifiable, Hashable, Sendable {
     var wallBottom: RGB
     var deskBase: RGB
     var deskGrain: RGB
+    /// How much varnish is on the desk, 0 bare to 1 mirror.
+    var deskGloss: CGFloat = 0.45
     var plinth: RGB
     var platter: RGB
     var metal: RGB
@@ -174,16 +176,16 @@ extension ScenePreset {
         id: "gallery",
         name: "Gallery",
         tagline: "A white room, a wooden desk, the blinds half open.",
-        cameraPosition: Vec3(0.050, 0.395, 1.640),
-        cameraTarget: Vec3(-0.010, 0.128, -0.020),
-        fieldOfView: 39,
+        cameraPosition: Vec3(0.050, 0.460, 1.620),
+        cameraTarget: Vec3(0.000, 0.220, -0.020),
+        fieldOfView: 42,
         fStop: 2.8,
         roll: -0.008,
         key: .init(kind: .spot(angle: 110),
                    position: Vec3(-1.05, 1.08, 0.72),
                    target: Vec3(-0.10, 0.10, -0.34),
                    color: RGB(1.0, 0.968, 0.912),
-                   intensity: 64, shadowRadius: 8, gobo: .blinds),
+                   intensity: 58, shadowRadius: 26, gobo: .blinds),
         fill: .init(kind: .area(width: 1.8, height: 1.2),
                     position: Vec3(0.92, 0.70, 1.05),
                     target: Vec3(0, 0.10, 0),
@@ -205,13 +207,14 @@ extension ScenePreset {
         wallBottom: RGB(0.848, 0.835, 0.813),
         deskBase: RGB(0.175, 0.108, 0.065),
         deskGrain: RGB(0.285, 0.185, 0.112),
+        deskGloss: 0.86,
         plinth: RGB(0.470, 0.455, 0.425),
         platter: RGB(0.560, 0.535, 0.485),
         metal: RGB(0.830, 0.795, 0.720),
-        dressing: .init(wall: true, shelf: false, framedArt: false, sleeve: true,
+        dressing: .init(wall: true, shelf: false, framedArt: true, sleeve: true,
                         stack: false, lamp: false, mug: false, plant: false,
                         headphones: false, books: false,
-                        sleeveStand: true, leaningFrame: true),
+                        sleeveStand: true, leaningFrame: false),
         dustCount: 70, dustColor: RGB(1.0, 0.97, 0.90)
     )
 

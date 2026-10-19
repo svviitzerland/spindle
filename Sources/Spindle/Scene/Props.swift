@@ -430,9 +430,9 @@ struct Props {
     // MARK: Wall
 
     /// A framed print. The art is generated, like every other image here.
-    func framedArt() -> SCNNode {
+    func framedArt(width: CGFloat = 0.46, height: CGFloat = 0.60) -> SCNNode {
         let frame = SCNNode()
-        let width: CGFloat = 0.46, height: CGFloat = 0.60, depth: CGFloat = 0.022
+        let depth: CGFloat = 0.022
 
         let outer = SCNBox(width: width, height: height, length: depth, chamferRadius: 0.002)
         outer.firstMaterial = Materials.varnishedWood(base: RGB(0.21, 0.14, 0.085),

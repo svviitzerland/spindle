@@ -302,7 +302,8 @@ final class TurntableScene {
         // Desk. Thicker than it needs to be, because the front edge is in
         // frame and a thin slab reads as cardboard.
         let desk = SCNBox(width: 3.2, height: 0.042, length: 1.25, chamferRadius: 0.0035)
-        let top = Materials.varnishedWood(base: preset.deskBase, grain: preset.deskGrain)
+        let top = Materials.varnishedWood(base: preset.deskBase, grain: preset.deskGrain,
+                                          gloss: preset.deskGloss)
         top.diffuse.contentsTransform = SCNMatrix4MakeScale(2.6, 1, 1)
         top.roughness.contentsTransform = SCNMatrix4MakeScale(2.6, 1, 1)
         desk.materials = [top]
@@ -402,9 +403,11 @@ final class TurntableScene {
             world.addChildNode(lamp)
         }
         if dressing.framedArt {
-            let frame = props.framedArt()
-            frame.position = SCNVector3(-0.120, 0.760, -0.600)
-            frame.eulerAngles = SCNVector3(0.02, 0, 0)
+            // Hung low, the way art sits above a sideboard, and small enough
+            // to clear the top of a 16:9 frame on a lens this long.
+            let frame = props.framedArt(width: 0.250, height: 0.310)
+            frame.position = SCNVector3(0.300, 0.440, -0.598)
+            frame.eulerAngles = SCNVector3(0.015, 0, 0)
             world.addChildNode(frame)
         }
         if dressing.shelf {

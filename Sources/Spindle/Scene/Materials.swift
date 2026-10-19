@@ -51,7 +51,8 @@ enum Materials {
 
     /// Desk timber under a satin varnish. The clear coat is what sells it:
     /// bare diffuse wood looks like cardboard.
-    static func varnishedWood(base: RGB, grain: RGB, seed: UInt64 = 7) -> SCNMaterial {
+    static func varnishedWood(base: RGB, grain: RGB, seed: UInt64 = 7,
+                              gloss: CGFloat = 0.45) -> SCNMaterial {
         let key = "wood-\(base)-\(grain)-\(seed)"
         let diffuse = cached(key + "-d") { Textures.wood(base: base, grain: grain, seed: seed) }
         let roughness = cached(key + "-r") { Textures.woodRoughness(seed: seed) }
@@ -71,8 +72,10 @@ enum Materials {
             m.normal.contents = normal
             m.normal.intensity = 0.6
             m.metalness.contents = 0.0
-            m.clearCoat.contents = 0.45
-            m.clearCoatRoughness.contents = 0.14
+            // The clear coat is the varnish. Raise it and the desk starts
+            // returning the window instead of just the light from it.
+            m.clearCoat.contents = gloss
+            m.clearCoatRoughness.contents = 0.17 - gloss * 0.14
             m.diffuse.wrapS = .repeat
             m.diffuse.wrapT = .repeat
             m.roughness.wrapS = .repeat
