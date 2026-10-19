@@ -77,12 +77,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
-        let exportItem = NSMenuItem(title: "Save Current Scene as Image…",
-                                    action: #selector(exportStill),
-                                    keyEquivalent: "s")
-        exportItem.target = self
-        menu.addItem(exportItem)
-
         menu.addItem(.separator())
 
         let settingsItem = NSMenuItem(title: "Settings…",
@@ -116,33 +110,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         preferencesWindow?.present()
     }
 
-    /// Render the current scene at the main display's resolution and let the
-    /// user keep it — a live wallpaper is not much use as a lock screen.
-    @objc private func exportStill() {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = "\(preferences.sceneID).png"
-        panel.title = "Save Scene as Image"
-        NSApp.activate(ignoringOtherApps: true)
-
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        let screen = NSScreen.main ?? NSScreen.screens.first
-        let scale = screen?.backingScaleFactor ?? 2
-        let size = screen.map {
-            CGSize(width: $0.frame.width * scale, height: $0.frame.height * scale)
-        } ?? CGSize(width: 2560, height: 1440)
-
-        do {
-            let image = try StillRenderer.render(preset: preferences.preset,
-                                                 size: size,
-                                                 seed: Preferences.Fixed.sleeveSeed)
-            try StillRenderer.writePNG(image, to: url)
-            NSWorkspace.shared.activateFileViewerSelecting([url])
-        } catch {
-            present(error: "Could not save the image.", detail: "\(error)")
-        }
-    }
-
     // MARK: Permission help
 
     /// macOS only prompts once. If the answer was no, nothing in the app can
@@ -164,14 +131,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!
         NSWorkspace.shared.open(url)
-    }
-
-    private func present(error message: String, detail: String) {
-        let alert = NSAlert()
-        alert.messageText = message
-        alert.informativeText = detail
-        alert.alertStyle = .warning
-        NSApp.activate(ignoringOtherApps: true)
-        alert.runModal()
     }
 }

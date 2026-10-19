@@ -18,7 +18,6 @@ The platter spins while the track plays, and stops when you pause.
 * Your album art, on a spinning record, behind your desktop icons
 * Three scenes to pick from
 * Can match your lock screen too
-* Save any scene as a still wallpaper
 * Lives in the menu bar and stays out of the way
 * Free and open source
 
