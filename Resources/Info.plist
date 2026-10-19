@@ -2,33 +2,33 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleName</key>
-	<string>Spindle</string>
 	<key>CFBundleDisplayName</key>
 	<string>Spindle</string>
-	<key>CFBundleIdentifier</key>
-	<string>com.spindle.wallpaper</string>
 	<key>CFBundleExecutable</key>
 	<string>spindle</string>
 	<key>CFBundleIconFile</key>
 	<string>Spindle</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.spindle.wallpaper</string>
+	<key>CFBundleName</key>
+	<string>Spindle</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>0.0.1</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
 	<key>LSUIElement</key>
 	<true/>
-	<key>NSHighResolutionCapable</key>
-	<true/>
-	<key>NSSupportsAutomaticTermination</key>
-	<false/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Spindle asks Music and Spotify what is playing so it can put the artwork on the record. Nothing leaves your Mac.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT licensed. See LICENSE.</string>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
 </dict>
 </plist>
