@@ -1,0 +1,124 @@
+import AppKit
+import Foundation
+
+/// A source Spindle can ask "what is playing?".
+protocol MusicProvider {
+    var source: NowPlaying.Source { get }
+    var isRunning: Bool { get }
+    /// Returns nil when the app is closed or stopped — not an error.
+    func fetch() throws -> NowPlaying?
+    /// Cover art for the current track, if the app will give it up.
+    func artwork() throws -> NSImage?
+}
+
+// MARK: - Spotify
+
+/// Spotify exposes the cover as an https URL, so artwork arrives over the
+/// network rather than through Apple Events.
+struct SpotifyProvider: MusicProvider {
+    let bridge: AppleScriptBridge
+    let source: NowPlaying.Source = .spotify
+
+    var isRunning: Bool { bridge.isRunning(source.bundleIdentifier) }
+
+    private static let stateScript = """
+    tell application id "com.spotify.client"
+        if player state is stopped then return "stopped"
+        set t to current track
+        return (name of t) & "\\n" & (artist of t) & "\\n" & (album of t) & "\\n" ¬
+            & ((duration of t) as text) & "\\n" & ((player position) as text) & "\\n" ¬
+            & ((player state) as text)
+    end tell
+    """
+
+    private static let artworkScript = """
+    tell application id "com.spotify.client"
+        if player state is stopped then return ""
+        return artwork url of current track
+    end tell
+    """
+
+    func fetch() throws -> NowPlaying? {
+        guard isRunning else { return nil }
+        let result = try bridge.run(Self.stateScript, cacheKey: "spotify.state")
+        guard let text = result.stringValue, text != "stopped" else { return nil }
+
+        let fields = text.components(separatedBy: "\n")
+        guard fields.count >= 6 else { return nil }
+        // Spotify reports track length in milliseconds.
+        let duration = (Double(fields[3]) ?? 0) / 1000.0
+        return NowPlaying(title: fields[0],
+                          artist: fields[1],
+                          album: fields[2],
+                          duration: duration,
+                          position: Double(fields[4]) ?? 0,
+                          isPlaying: fields[5].lowercased().contains("playing"),
+                          source: source)
+    }
+
+    func artwork() throws -> NSImage? {
+        guard isRunning else { return nil }
+        let result = try bridge.run(Self.artworkScript, cacheKey: "spotify.artwork")
+        guard let urlString = result.stringValue,
+              let url = URL(string: urlString),
+              url.scheme == "https" else { return nil }
+        // The only network request Spindle ever makes, and only to the URL
+        // Spotify itself handed over.
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return NSImage(data: data)
+    }
+}
+
+// MARK: - Apple Music
+
+/// Music hands over raw image bytes, so nothing touches the network.
+struct AppleMusicProvider: MusicProvider {
+    let bridge: AppleScriptBridge
+    let source: NowPlaying.Source = .appleMusic
+
+    var isRunning: Bool { bridge.isRunning(source.bundleIdentifier) }
+
+    private static let stateScript = """
+    tell application id "com.apple.Music"
+        if player state is stopped then return "stopped"
+        set t to current track
+        return (name of t) & "\\n" & (artist of t) & "\\n" & (album of t) & "\\n" ¬
+            & ((duration of t) as text) & "\\n" & ((player position) as text) & "\\n" ¬
+            & ((player state) as text)
+    end tell
+    """
+
+    private static let artworkScript = """
+    tell application id "com.apple.Music"
+        if player state is stopped then return missing value
+        set t to current track
+        if (count of artworks of t) is 0 then return missing value
+        return raw data of artwork 1 of t
+    end tell
+    """
+
+    func fetch() throws -> NowPlaying? {
+        guard isRunning else { return nil }
+        let result = try bridge.run(Self.stateScript, cacheKey: "music.state")
+        guard let text = result.stringValue, text != "stopped" else { return nil }
+
+        let fields = text.components(separatedBy: "\n")
+        guard fields.count >= 6 else { return nil }
+        return NowPlaying(title: fields[0],
+                          artist: fields[1],
+                          album: fields[2],
+                          duration: Double(fields[3]) ?? 0,
+                          position: Double(fields[4]) ?? 0,
+                          isPlaying: fields[5].lowercased().contains("playing"),
+                          source: source)
+    }
+
+    func artwork() throws -> NSImage? {
+        guard isRunning else { return nil }
+        let result = try bridge.run(Self.artworkScript, cacheKey: "music.artwork")
+        // Depending on the file, Music returns TIFF, JPEG or PNG bytes; NSImage
+        // sniffs all three, so the descriptor type does not need decoding.
+        guard let data = result.data as Data?, !data.isEmpty else { return nil }
+        return NSImage(data: data)
+    }
+}
