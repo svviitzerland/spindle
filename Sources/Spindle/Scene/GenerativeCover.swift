@@ -4,9 +4,9 @@ import Foundation
 
 /// Spindle ships no album covers.
 ///
-/// When nothing is playing — or when you ask it to stay standalone — the
-/// sleeve and label show artwork drawn from a seed at launch. Abstract,
-/// deterministic, and nobody's intellectual property but yours.
+/// When nothing is playing, the sleeve and label show artwork drawn from a
+/// seed at launch: abstract, deterministic, and nobody's intellectual
+/// property but yours.
 enum GenerativeCover {
 
     struct Palette {

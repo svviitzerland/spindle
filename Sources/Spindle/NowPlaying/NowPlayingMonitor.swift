@@ -6,26 +6,9 @@ import Foundation
 /// Polling, rather than listening for the apps' distributed notifications,
 /// because those only fire on track change: without a poll the tonearm would
 /// never learn that you hit pause or scrubbed.
+///
+/// Whichever app is actually playing wins, so there is nothing to configure.
 final class NowPlayingMonitor {
-
-    /// How Spindle decides which app to believe.
-    enum Preference: String, CaseIterable, Identifiable {
-        case automatic
-        case appleMusic
-        case spotify
-        case standalone
-
-        var id: String { rawValue }
-
-        var displayName: String {
-            switch self {
-            case .automatic: return "Whatever is playing"
-            case .appleMusic: return "Music only"
-            case .spotify: return "Spotify only"
-            case .standalone: return "Standalone"
-            }
-        }
-    }
 
     /// Called on the main queue whenever the picture changes.
     var onChange: ((NowPlaying?) -> Void)?
@@ -33,10 +16,6 @@ final class NowPlayingMonitor {
     var onArtwork: ((NSImage?) -> Void)?
     /// Called once if macOS refuses the Apple Events permission.
     var onPermissionDenied: ((NowPlaying.Source) -> Void)?
-
-    var preference: Preference = .automatic {
-        didSet { if preference != oldValue { forceRefresh() } }
-    }
 
     private let bridge = AppleScriptBridge()
     private let providers: [MusicProvider]
@@ -73,7 +52,7 @@ final class NowPlayingMonitor {
     // MARK: Polling
 
     private func poll() {
-        let playing = preference == .standalone ? nil : readCurrent()
+        let playing = readCurrent()
         let changed = playing?.trackKey != lastTrackKey
 
         if changed {
@@ -100,7 +79,7 @@ final class NowPlayingMonitor {
     /// the moment you hit pause.
     private func readCurrent() -> NowPlaying? {
         var paused: NowPlaying?
-        for provider in candidates() {
+        for provider in providers {
             guard !deniedSources.contains(provider.source) else { continue }
             do {
                 guard let state = try provider.fetch() else { continue }
@@ -120,15 +99,6 @@ final class NowPlayingMonitor {
         } catch {
             note(error, from: source)
             return nil
-        }
-    }
-
-    private func candidates() -> [MusicProvider] {
-        switch preference {
-        case .automatic: return providers
-        case .appleMusic: return providers.filter { $0.source == .appleMusic }
-        case .spotify: return providers.filter { $0.source == .spotify }
-        case .standalone: return []
         }
     }
 

@@ -21,7 +21,7 @@ final class WallpaperController {
     init(preferences: Preferences = .shared, nowPlaying: NowPlayingStore) {
         self.preferences = preferences
         self.nowPlaying = nowPlaying
-        self.turntable = TurntableScene(preset: preferences.preset, seed: preferences.seed)
+        self.turntable = TurntableScene(preset: preferences.preset, seed: Preferences.Fixed.sleeveSeed)
     }
 
     // MARK: Lifecycle
@@ -31,7 +31,6 @@ final class WallpaperController {
         observePreferences()
         observeScreens()
 
-        monitor.preference = preferences.source
         monitor.onChange = { [weak self] playing in
             self?.nowPlaying.update(playing)
             self?.apply(playing)
@@ -44,7 +43,7 @@ final class WallpaperController {
             self?.nowPlaying.denied(source)
             self?.onPermissionDenied?(source)
         }
-        monitor.start(interval: preferences.pollInterval)
+        monitor.start(interval: Preferences.Fixed.pollInterval)
 
         // The tonearm creeps inward between polls rather than jumping every
         // two seconds when the next sample lands.
@@ -75,7 +74,7 @@ final class WallpaperController {
             let window = WallpaperWindow(screen: screen,
                                          scene: turntable.scene,
                                          pointOfView: turntable.pointOfView,
-                                         frameRateLimit: preferences.frameRateLimit)
+                                         frameRateLimit: Preferences.Fixed.frameRate)
             window.update(for: screen)
             window.orderFrontRegardless()
             return window
@@ -98,22 +97,6 @@ final class WallpaperController {
             .sink { [weak self] id in self?.turntable.apply(ScenePreset.preset(id: id)) }
             .store(in: &cancellables)
 
-        preferences.$source
-            .dropFirst()
-            .sink { [weak self] source in self?.monitor.preference = source }
-            .store(in: &cancellables)
-
-        preferences.$frameRateLimit
-            .dropFirst()
-            .sink { [weak self] fps in self?.windows.forEach { $0.setFrameRateLimit(fps) } }
-            .store(in: &cancellables)
-
-        preferences.$pollInterval
-            .dropFirst()
-            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
-            .sink { [weak self] interval in self?.monitor.start(interval: interval) }
-            .store(in: &cancellables)
-
         preferences.$spinWhenPaused
             .dropFirst()
             .sink { [weak self] _ in self?.apply(self?.monitor.current) }
@@ -122,15 +105,6 @@ final class WallpaperController {
         preferences.$showTrackInfo
             .dropFirst()
             .sink { [weak self] _ in self?.applyTrackInfo(self?.monitor.current) }
-            .store(in: &cancellables)
-
-        preferences.$seed
-            .dropFirst()
-            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
-            .sink { [weak self] seed in
-                guard let self, self.monitor.current == nil else { return }
-                self.turntable.setArtwork(GenerativeCover.make(seed: seed).image)
-            }
             .store(in: &cancellables)
     }
 
@@ -142,7 +116,7 @@ final class WallpaperController {
             turntable.setProgress(playing.interpolatedProgress())
         } else {
             // Nothing playing: show the generated sleeve and park the arm.
-            let generated = GenerativeCover.make(seed: preferences.seed).image
+            let generated = GenerativeCover.make(seed: Preferences.Fixed.sleeveSeed).image
             nowPlaying.update(artwork: generated)
             turntable.setArtwork(generated)
             turntable.setSpinning(preferences.spinWhenPaused)

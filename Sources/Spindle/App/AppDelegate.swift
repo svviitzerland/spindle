@@ -77,20 +77,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
-        let sourceItem = NSMenuItem(title: "Follow", action: nil, keyEquivalent: "")
-        let sourceMenu = NSMenu()
-        for option in NowPlayingMonitor.Preference.allCases {
-            let item = NSMenuItem(title: option.displayName,
-                                  action: #selector(selectSource(_:)),
-                                  keyEquivalent: "")
-            item.target = self
-            item.representedObject = option.rawValue
-            item.state = preferences.source == option ? .on : .off
-            sourceMenu.addItem(item)
-        }
-        sourceItem.submenu = sourceMenu
-        menu.addItem(sourceItem)
-
         let exportItem = NSMenuItem(title: "Save Current Scene as Image…",
                                     action: #selector(exportStill),
                                     keyEquivalent: "s")
@@ -118,12 +104,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func selectScene(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
         preferences.sceneID = id
-    }
-
-    @objc private func selectSource(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String,
-              let option = NowPlayingMonitor.Preference(rawValue: raw) else { return }
-        preferences.source = option
     }
 
     @objc private func openPreferences() {
@@ -155,7 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             let image = try StillRenderer.render(preset: preferences.preset,
                                                  size: size,
-                                                 seed: preferences.seed)
+                                                 seed: Preferences.Fixed.sleeveSeed)
             try StillRenderer.writePNG(image, to: url)
             NSWorkspace.shared.activateFileViewerSelecting([url])
         } catch {

@@ -24,7 +24,7 @@ final class PreferencesWindowController: NSWindowController {
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = NSColor(srgbRed: 0.063, green: 0.059, blue: 0.055, alpha: 1)
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: Theme.windowWidth, height: 724))
+        window.setContentSize(NSSize(width: Theme.windowWidth, height: 566))
         window.center()
         self.init(window: window)
     }
@@ -71,7 +71,6 @@ struct PreferencesView: View {
                     .padding(.top, 6)
 
                 NowPlayingCard(store: nowPlaying,
-                               source: preferences.source,
                                onRecheckPermissions: onRecheckPermissions)
 
                 ScenePicker(preferences: preferences, previews: previews)
@@ -102,7 +101,6 @@ private struct Wordmark: View {
 
 private struct NowPlayingCard: View {
     @ObservedObject var store: NowPlayingStore
-    let source: NowPlayingMonitor.Preference
     let onRecheckPermissions: () -> Void
 
     var body: some View {
@@ -161,12 +159,10 @@ private struct NowPlayingCard: View {
             // rather than falling back to the placeholder disc.
             Artwork(image: store.artwork)
             VStack(alignment: .leading, spacing: 3) {
-                Text(source == .standalone ? "Standalone" : "Nothing playing")
+                Text("Nothing playing")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.primary)
-                Text(source == .standalone
-                     ? "Showing a generated sleeve."
-                     : "Start a track in Music or Spotify.")
+                Text("Start a track in Music or Spotify.")
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.secondary)
             }
@@ -358,42 +354,12 @@ private struct SettingsCard: View {
     var body: some View {
         Card(padding: 0) {
             VStack(spacing: 0) {
-                Row(icon: "music.note", title: "Follow") {
-                    Picker("", selection: $preferences.source) {
-                        ForEach(NowPlayingMonitor.Preference.allCases) { option in
-                            Text(option.displayName).tag(option)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 168)
-                }
-
-                if preferences.source == .standalone {
-                    Row(icon: "wand.and.stars", title: "Sleeve seed") {
-                        TextField("", text: $preferences.seed)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 168)
-                            .help("Any text. The same text always draws the same sleeve.")
-                    }
-                }
-
                 Row(icon: "textformat", title: "Show track on desktop") {
                     Toggle("", isOn: $preferences.showTrackInfo).labelsHidden()
                 }
 
                 Row(icon: "pause.circle", title: "Keep turning when paused") {
                     Toggle("", isOn: $preferences.spinWhenPaused).labelsHidden()
-                }
-
-                Row(icon: "speedometer", title: "Frame rate") {
-                    Picker("", selection: $preferences.frameRateLimit) {
-                        Text("24").tag(24)
-                        Text("30").tag(30)
-                        Text("60").tag(60)
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 150)
                 }
 
                 Row(icon: "power", title: "Open at login", isLast: true) {
