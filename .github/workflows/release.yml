@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. v0.2.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # release notes are generated from the commit range
+
+      - name: Work out the version
+        id: version
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          echo "tag=$VERSION"              >> "$GITHUB_OUTPUT"
+          echo "number=${VERSION#v}"       >> "$GITHUB_OUTPUT"
+
+      - name: Build for Apple Silicon and Intel
+        run: make universal
+
+      # Without these secrets the app is signed ad-hoc: it still runs, but
+      # Gatekeeper will warn on first launch. See RELEASING in the README.
+      - name: Import the signing certificate
+        id: signing
+        env:
+          CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          if [ -z "$CERTIFICATE" ]; then
+            echo "::warning::no signing certificate configured; falling back to an ad-hoc signature"
+            echo "identity=-" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          echo "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" \
+            -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychain -d user -s "$KEYCHAIN" login.keychain-db
+          rm -f "$RUNNER_TEMP/cert.p12"
+          echo "identity=$SIGN_IDENTITY" >> "$GITHUB_OUTPUT"
+
+      - name: Assemble Spindle.app
+        env:
+          VERSION: ${{ steps.version.outputs.number }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          SIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
+        run: ./scripts/bundle.sh
+
+      - name: Package the disk image
+        env:
+          VERSION: ${{ steps.version.outputs.number }}
+        run: ./scripts/dmg.sh
+
+      - name: Notarize
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          DMG: dist/Spindle-${{ steps.version.outputs.number }}.dmg
+        run: |
+          if [ -z "$APPLE_ID" ]; then
+            echo "::warning::no notarization credentials; the download will warn on first open"
+            exit 0
+          fi
+          xcrun notarytool submit "$DMG" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$TEAM_ID" \
+            --password "$APP_PASSWORD" \
+            --wait
+          # Stapling lets the ticket travel with the file, so Gatekeeper is
+          # satisfied even on a machine that is offline.
+          xcrun stapler staple "$DMG"
+
+      - name: Write the install notes
+        run: |
+          cat > "$RUNNER_TEMP/notes.md" <<'NOTES'
+          ### Install
+
+          Download the disk image, open it, and drag Spindle to Applications.
+
+          Spindle lives in the menu bar — there is no Dock icon and no window.
+          On first launch macOS asks whether Spindle may control Music or
+          Spotify; that is how it reads the track and the cover art.
+          NOTES
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          DMG: dist/Spindle-${{ steps.version.outputs.number }}.dmg
+        run: |
+          gh release create "$TAG" "$DMG" \
+            --title "Spindle $TAG" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --generate-notes

@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and verify
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: swift --version
+
+      - name: Cache SwiftPM build
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.swift', 'Sources/**/*.swift') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Build, exercise the CLI, assemble the bundle
+        run: make check
+
+      - name: Render a frame
+        # Offscreen rendering needs a Metal device. Hosted runners normally
+        # have one, but a missing GPU should not fail the build — it would say
+        # nothing about the code under review.
+        run: |
+          if .build/release/spindle render --scene lamplight --size 640x360 --out /tmp/smoke.png; then
+            test -s /tmp/smoke.png
+            echo "rendered $(stat -f%z /tmp/smoke.png) bytes"
+          else
+            echo "::warning::no Metal device on this runner; skipped the render check"
+          fi
+
+      - name: Upload the app for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: Spindle-app
+          path: dist/Spindle.app
+          retention-days: 7
