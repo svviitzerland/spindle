@@ -24,7 +24,7 @@ final class PreferencesWindowController: NSWindowController {
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = NSColor(srgbRed: 0.063, green: 0.059, blue: 0.055, alpha: 1)
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: Theme.windowWidth, height: 566))
+        window.setContentSize(NSSize(width: Theme.windowWidth, height: 622))
         window.center()
         self.init(window: window)
     }
@@ -362,6 +362,12 @@ private struct SettingsCard: View {
                     Toggle("", isOn: $preferences.spinWhenPaused).labelsHidden()
                 }
 
+                Row(icon: "lock.display",
+                    title: "Use on the lock screen",
+                    subtitle: "Sets your desktop picture to a still of this scene.") {
+                    Toggle("", isOn: $preferences.lockScreenBackground).labelsHidden()
+                }
+
                 Row(icon: "power", title: "Open at login", isLast: true) {
                     Toggle("", isOn: launchAtLogin).labelsHidden()
                 }
@@ -375,6 +381,7 @@ private struct SettingsCard: View {
 private struct Row<Content: View>: View {
     let icon: String
     let title: String
+    var subtitle: String? = nil
     var isLast: Bool = false
     @ViewBuilder let content: Content
 
@@ -386,15 +393,24 @@ private struct Row<Content: View>: View {
                     .foregroundStyle(Theme.faint)
                     .frame(width: 18)
 
-                Text(title)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.primary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.primary)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.faint)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
 
                 Spacer(minLength: 12)
                 content
             }
             .padding(.horizontal, 14)
-            .frame(height: 46)
+            .padding(.vertical, 11)
+            .frame(minHeight: 46)
 
             if !isLast {
                 Rectangle()

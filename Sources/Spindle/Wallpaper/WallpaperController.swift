@@ -10,6 +10,7 @@ final class WallpaperController {
     /// Shared with the settings window so it can show what is playing.
     let nowPlaying: NowPlayingStore
     private let monitor = NowPlayingMonitor()
+    private let lockScreen = LockScreenBackground()
     private var turntable: TurntableScene
     private var windows: [WallpaperWindow] = []
     private var cancellables: Set<AnyCancellable> = []
@@ -51,6 +52,21 @@ final class WallpaperController {
             self?.advanceTonearm()
         }
         apply(nil)
+        refreshLockScreen()
+    }
+
+    /// Re-render the lock screen still. Called when the scene changes or a
+    /// display is added.
+    ///
+    /// When the setting is off this puts back the wallpaper Spindle replaced,
+    /// which covers the case of it being switched off while the app was not
+    /// running: otherwise our render would be left on the desktop for good.
+    private func refreshLockScreen() {
+        guard preferences.lockScreenBackground else {
+            lockScreen.restore()
+            return
+        }
+        lockScreen.apply(preset: preferences.preset)
     }
 
     func stop() {
@@ -81,6 +97,7 @@ final class WallpaperController {
         }
         Log.info("wallpaper showing on \(windows.count) display(s)")
         applyTrackInfo(monitor.current)
+        refreshLockScreen()
     }
 
     private func observeScreens() {
@@ -94,7 +111,23 @@ final class WallpaperController {
     private func observePreferences() {
         preferences.$sceneID
             .dropFirst()
-            .sink { [weak self] id in self?.turntable.apply(ScenePreset.preset(id: id)) }
+            .sink { [weak self] id in
+                guard let self else { return }
+                self.turntable.apply(ScenePreset.preset(id: id))
+                self.refreshLockScreen()
+            }
+            .store(in: &cancellables)
+
+        preferences.$lockScreenBackground
+            .dropFirst()
+            .sink { [weak self] enabled in
+                guard let self else { return }
+                if enabled {
+                    self.lockScreen.apply(preset: self.preferences.preset)
+                } else {
+                    self.lockScreen.restore()
+                }
+            }
             .store(in: &cancellables)
 
         preferences.$spinWhenPaused

@@ -25,6 +25,7 @@ final class Preferences: ObservableObject {
         static let scene = "scene"
         static let spinWhenPaused = "spinWhenPaused"
         static let showTrackInfo = "showTrackInfo"
+        static let lockScreen = "lockScreenBackground"
     }
 
     private let defaults: UserDefaults
@@ -40,6 +41,12 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(showTrackInfo, forKey: Key.showTrackInfo) }
     }
 
+    /// Put a still of the scene on the lock screen, by way of the desktop
+    /// picture. Off by default: it changes a system setting.
+    @Published var lockScreenBackground: Bool {
+        didSet { defaults.set(lockScreenBackground, forKey: Key.lockScreen) }
+    }
+
     var preset: ScenePreset { ScenePreset.preset(id: sceneID) }
 
     init(defaults: UserDefaults = .standard) {
@@ -47,6 +54,7 @@ final class Preferences: ObservableObject {
         sceneID = defaults.string(forKey: Key.scene) ?? ScenePreset.daylight.id
         spinWhenPaused = defaults.object(forKey: Key.spinWhenPaused) as? Bool ?? false
         showTrackInfo = defaults.object(forKey: Key.showTrackInfo) as? Bool ?? true
+        lockScreenBackground = defaults.object(forKey: Key.lockScreen) as? Bool ?? false
     }
 
     // MARK: Launch at login
