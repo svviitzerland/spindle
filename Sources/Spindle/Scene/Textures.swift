@@ -256,7 +256,17 @@ enum Textures {
             let localV = v * planks - board
             let spacing = 11.0 + n.value(board * 13.0 + 5.0) * 11.0
             let rings = abs(sin((localV * spacing + n.value(board * 37.0) * 20.0) * .pi))
-            let r = 0.38 + rings * 0.20 + n.value(u * 300, v * 7) * 0.06
+            var r = 0.38 + rings * 0.20 + n.value(u * 300, v * 7) * 0.06
+
+            // Settled dust and hand wear. A desk polished evenly across its
+            // whole surface is one of the surest signs of a render: the
+            // varnish should be duller in patches, and duller still where
+            // things get put down.
+            let settled = n.fbm(u * 3.2, v * 3.2, octaves: 4)
+            r += max(0, settled - 0.52) * 0.55
+            let wear = n.fbm(u * 1.1 + 31.0, v * 1.1, octaves: 3)
+            r += max(0, wear - 0.58) * 0.40
+
             return (r, r, r, 1)
         }
     }
@@ -434,7 +444,7 @@ enum Textures {
     /// Slats run at an angle, because a blind is almost never square to the
     /// wall you are looking at, and that diagonal banding is what gives a
     /// plain white room its character.
-    static func blindGobo(slats: Double = 8, tilt: Double = -0.34,
+    static func blindGobo(slats: Double = 9, tilt: Double = -0.34,
                           size: Int = 512) -> CGImage {
         image(width: size, height: size) { u, v in
             // Rotate the sampling axis, then band along it.
@@ -448,7 +458,9 @@ enum Textures {
             // Wide, soft transitions. Narrow slats with hard edges give you
             // stage lighting; a bedroom near a window gets broad bands that
             // fade into each other.
-            let lit: Double = smooth(distance, openness - 0.17, openness + 0.15)
+            // Soft edged, but still edges. Widen this much further and the
+            // bands stop being light through a blind and become a smear.
+            let lit: Double = smooth(distance, openness - 0.09, openness + 0.08)
 
             // Fall off at the edge of the cone so the light does not stop on
             // a hard circle.

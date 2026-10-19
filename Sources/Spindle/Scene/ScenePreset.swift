@@ -98,6 +98,9 @@ struct ScenePreset: Identifiable, Hashable, Sendable {
     var deskGrain: RGB
     /// How much varnish is on the desk, 0 bare to 1 mirror.
     var deskGloss: CGFloat = 0.45
+    /// Turn the deck a degree or two off square. Nothing in a real room is
+    /// aligned to the camera, and perfect alignment reads as a diagram.
+    var deckYaw: CGFloat = 0
     var plinth: RGB
     var platter: RGB
     var metal: RGB
@@ -179,35 +182,39 @@ extension ScenePreset {
         cameraPosition: Vec3(0.050, 0.460, 1.620),
         cameraTarget: Vec3(0.000, 0.220, -0.020),
         fieldOfView: 42,
-        fStop: 2.8,
+        // SceneKit's defocus is far weaker than the optics this number
+        // describes: f/1.7 was indistinguishable from everything in focus.
+        // Treat it as a blur strength, not an aperture.
+        fStop: 0.62,
         roll: -0.008,
         key: .init(kind: .spot(angle: 110),
                    position: Vec3(-1.05, 1.08, 0.72),
                    target: Vec3(-0.10, 0.10, -0.34),
                    color: RGB(1.0, 0.968, 0.912),
-                   intensity: 58, shadowRadius: 26, gobo: .blinds),
+                   intensity: 44, shadowRadius: 13, gobo: .blinds),
         fill: .init(kind: .area(width: 1.8, height: 1.2),
                     position: Vec3(0.92, 0.70, 1.05),
                     target: Vec3(0, 0.10, 0),
-                    color: RGB(0.88, 0.91, 1.0),
-                    intensity: 420, castsShadow: false),
+                    color: RGB(0.62, 0.72, 1.0),
+                    intensity: 185, castsShadow: false),
         bounce: .init(kind: .area(width: 1.5, height: 1.0),
                       position: Vec3(0.0, 0.015, 0.45),
                       target: Vec3(0, 0.26, -0.10),
-                      color: RGB(0.58, 0.44, 0.30),
-                      intensity: 150, castsShadow: false),
-        ambient: RGB(0.95, 0.94, 0.92),
-        ambientIntensity: 12,
+                      color: RGB(0.55, 0.40, 0.26),
+                      intensity: 70, castsShadow: false),
+        ambient: RGB(0.78, 0.83, 0.95),
+        ambientIntensity: 3,
         environmentTint: RGB(1.0, 0.980, 0.950),
-        environmentIntensity: 0.34,
-        exposure: -0.18,
-        vignette: 0.30,
-        bloom: 0.09,
+        environmentIntensity: 0.17,
+        exposure: -0.62,
+        vignette: 0.44,
+        bloom: 0.07,
         wallTop: RGB(0.905, 0.893, 0.872),
         wallBottom: RGB(0.848, 0.835, 0.813),
         deskBase: RGB(0.175, 0.108, 0.065),
         deskGrain: RGB(0.285, 0.185, 0.112),
         deskGloss: 0.86,
+        deckYaw: -0.042,
         plinth: RGB(0.470, 0.455, 0.425),
         platter: RGB(0.560, 0.535, 0.485),
         metal: RGB(0.830, 0.795, 0.720),

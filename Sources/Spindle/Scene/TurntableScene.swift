@@ -161,6 +161,7 @@ final class TurntableScene {
         addRoom()
 
         deck = Deck(preset: preset, artwork: artwork, pressing: pressing)
+        deck.node.eulerAngles = SCNVector3(0, preset.deckYaw, 0)
         world.addChildNode(deck.node)
 
         addDressing()
@@ -205,7 +206,7 @@ final class TurntableScene {
         camera.grainIsColored = false
 
         // Contact shadows, without which nothing sits on the desk.
-        camera.screenSpaceAmbientOcclusionIntensity = 1.4
+        camera.screenSpaceAmbientOcclusionIntensity = 1.9
         camera.screenSpaceAmbientOcclusionRadius = 0.09
         camera.screenSpaceAmbientOcclusionBias = 0.012
 
