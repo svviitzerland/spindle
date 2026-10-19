@@ -442,6 +442,12 @@ private struct Card<Content: View>: View {
 }
 
 private struct Footer: View {
+    /// Where the project lives. Clicking the credit opens it.
+    private static let author = "svviitzerland"
+    private static let profile = URL(string: "https://github.com/svviitzerland/spindle")!
+
+    @State private var isHovering = false
+
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     }
@@ -449,8 +455,23 @@ private struct Footer: View {
     var body: some View {
         HStack {
             Text("Spindle \(version)")
+
             Spacer()
-            Text("MIT licensed")
+
+            Link(destination: Self.profile) {
+                Text("by \(Self.author)")
+                    .underline(isHovering)
+                    .foregroundStyle(isHovering ? Theme.accent : Theme.faint)
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering in
+                isHovering = hovering
+                // A link should admit it is one before you click it. Using
+                // set() rather than push()/pop(), which leaves the cursor
+                // stack unbalanced if the window closes mid-hover.
+                (hovering ? NSCursor.pointingHand : NSCursor.arrow).set()
+            }
+            .help(Self.profile.absoluteString)
         }
         .font(.system(size: 10))
         .foregroundStyle(Theme.faint)
