@@ -7,6 +7,8 @@ import SceneKit
 final class WallpaperController {
 
     private let preferences: Preferences
+    /// Shared with the settings window so it can show what is playing.
+    let nowPlaying: NowPlayingStore
     private let monitor = NowPlayingMonitor()
     private var turntable: TurntableScene
     private var windows: [WallpaperWindow] = []
@@ -16,8 +18,9 @@ final class WallpaperController {
     /// Raised when an app refuses automation, so the menu can offer a fix.
     var onPermissionDenied: ((NowPlaying.Source) -> Void)?
 
-    init(preferences: Preferences = .shared) {
+    init(preferences: Preferences = .shared, nowPlaying: NowPlayingStore) {
         self.preferences = preferences
+        self.nowPlaying = nowPlaying
         self.turntable = TurntableScene(preset: preferences.preset, seed: preferences.seed)
     }
 
@@ -29,9 +32,18 @@ final class WallpaperController {
         observeScreens()
 
         monitor.preference = preferences.source
-        monitor.onChange = { [weak self] playing in self?.apply(playing) }
-        monitor.onArtwork = { [weak self] image in self?.turntable.setArtwork(image) }
-        monitor.onPermissionDenied = { [weak self] source in self?.onPermissionDenied?(source) }
+        monitor.onChange = { [weak self] playing in
+            self?.nowPlaying.update(playing)
+            self?.apply(playing)
+        }
+        monitor.onArtwork = { [weak self] image in
+            self?.nowPlaying.update(artwork: image)
+            self?.turntable.setArtwork(image)
+        }
+        monitor.onPermissionDenied = { [weak self] source in
+            self?.nowPlaying.denied(source)
+            self?.onPermissionDenied?(source)
+        }
         monitor.start(interval: preferences.pollInterval)
 
         // The tonearm creeps inward between polls rather than jumping every
@@ -51,6 +63,7 @@ final class WallpaperController {
     }
 
     func refreshPermissions() {
+        nowPlaying.clearDenial()
         monitor.clearDenials()
     }
 
@@ -129,7 +142,9 @@ final class WallpaperController {
             turntable.setProgress(playing.interpolatedProgress())
         } else {
             // Nothing playing: show the generated sleeve and park the arm.
-            turntable.setArtwork(GenerativeCover.make(seed: preferences.seed).image)
+            let generated = GenerativeCover.make(seed: preferences.seed).image
+            nowPlaying.update(artwork: generated)
+            turntable.setArtwork(generated)
             turntable.setSpinning(preferences.spinWhenPaused)
             turntable.parkTonearm()
         }

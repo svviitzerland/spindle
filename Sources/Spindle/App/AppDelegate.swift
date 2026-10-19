@@ -6,7 +6,9 @@ import Combine
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let preferences = Preferences.shared
-    private lazy var controller = WallpaperController(preferences: preferences)
+    private let nowPlaying = NowPlayingStore()
+    private lazy var controller = WallpaperController(preferences: preferences,
+                                                      nowPlaying: nowPlaying)
     private var statusItem: NSStatusItem?
     private var preferencesWindow: PreferencesWindowController?
     private var cancellables: Set<AnyCancellable> = []
@@ -26,6 +28,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
 
         Log.info("spindle running")
+    }
+
+    /// Spindle has no windows, so opening it again from Finder or Spotlight
+    /// would otherwise do nothing at all. Show the settings instead.
+    func applicationShouldHandleReopen(_ sender: NSApplication,
+                                       hasVisibleWindows: Bool) -> Bool {
+        openPreferences()
+        return true
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -118,9 +128,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openPreferences() {
         if preferencesWindow == nil {
-            preferencesWindow = PreferencesWindowController(preferences: preferences) {
-                [weak self] in self?.controller.refreshPermissions()
-            }
+            preferencesWindow = PreferencesWindowController(
+                preferences: preferences,
+                nowPlaying: nowPlaying,
+                onRecheckPermissions: { [weak self] in self?.controller.refreshPermissions() })
         }
         preferencesWindow?.present()
     }
