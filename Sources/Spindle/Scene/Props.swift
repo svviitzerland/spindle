@@ -48,21 +48,31 @@ struct Props {
     // MARK: Record stack
 
     /// Four sleeves dropped on the desk, each a little out of square.
-    func recordStack() -> SCNNode {
+    struct RecordStack {
+        let node: SCNNode
+        /// The face of the top sleeve, the only one the fan leaves visible.
+        let topCover: SCNMaterial
+    }
+
+    func recordStack() -> RecordStack {
         let stack = SCNNode()
-        let thickness: CGFloat = 0.0085
+        // A 12-inch record is 1.9 mm and its sleeve is card, so a filled
+        // sleeve is about 5 mm. Anything more and the pile reads as plywood.
+        let thickness: CGFloat = 0.0048
+        let topCover = Materials.paperboard(
+            GenerativeCover.make(seed: "stack").image, seed: 711)
+
         for i in 0..<4 {
             let sleeve = SCNBox(width: 0.315, height: thickness, length: 0.315,
-                                chamferRadius: 0.0014)
+                                chamferRadius: 0.0009)
             let card = Materials.paperboard(
                 Textures.solid(RGB(0.055 + CGFloat(i) * 0.02,
                                    0.052 + CGFloat(i) * 0.02,
                                    0.058 + CGFloat(i) * 0.02)),
                 seed: UInt64(700 + i))
+            // SCNBox face order: front, right, back, left, top, bottom.
             if i == 3 {
-                let cover = Materials.paperboard(
-                    GenerativeCover.make(seed: "stack").image, seed: 711)
-                sleeve.materials = [card, card, card, card, cover, card]
+                sleeve.materials = [card, card, card, card, topCover, card]
             } else {
                 sleeve.materials = [card]
             }
@@ -74,7 +84,7 @@ struct Props {
             node.castsShadow = true
             stack.addChildNode(node)
         }
-        return stack
+        return RecordStack(node: stack, topCover: topCover)
     }
 
     // MARK: Mug

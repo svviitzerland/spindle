@@ -55,6 +55,15 @@ final class TurntableScene {
         sleeveMaterial?.diffuse.contents = art
     }
 
+    /// Put a cover on the pile beside the deck. Neither Music nor Spotify
+    /// will say what is coming next, so the stack shows what just finished,
+    /// which is what a pile of records beside a turntable actually is.
+    func setLastPlayed(_ image: NSImage?) {
+        lastPlayedArtwork = image
+        guard let image else { return }
+        stackCoverMaterial?.diffuse.contents = image
+    }
+
     func setSpinning(_ spinning: Bool) {
         isSpinning = spinning
         deck.spinNode.removeAction(forKey: "spin")
@@ -99,10 +108,14 @@ final class TurntableScene {
     // MARK: Build
 
     private var sleeveMaterial: SCNMaterial?
+    private var stackCoverMaterial: SCNMaterial?
+    /// The cover of the last thing played, waiting on the pile.
+    private var lastPlayedArtwork: NSImage?
 
     private func build() {
         world.childNodes.forEach { $0.removeFromParentNode() }
         sleeveMaterial = nil
+        stackCoverMaterial = nil
 
         configureEnvironment()
         configureCamera()
@@ -292,9 +305,13 @@ final class TurntableScene {
         }
         if dressing.stack {
             let stack = props.recordStack()
-            stack.position = SCNVector3(0.395, 0, 0.165)
-            stack.eulerAngles = SCNVector3(0, -0.44, 0)
-            world.addChildNode(stack)
+            stackCoverMaterial = stack.topCover
+            if let lastPlayedArtwork {
+                stack.topCover.diffuse.contents = lastPlayedArtwork
+            }
+            stack.node.position = SCNVector3(0.395, 0, 0.165)
+            stack.node.eulerAngles = SCNVector3(0, -0.44, 0)
+            world.addChildNode(stack.node)
         }
         if dressing.mug {
             let mug = props.mug()

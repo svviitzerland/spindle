@@ -11,6 +11,9 @@ final class WallpaperController {
     let nowPlaying: NowPlayingStore
     private let monitor = NowPlayingMonitor()
     private let lockScreen = LockScreenBackground()
+    /// What is on the platter now, so it can be moved to the pile when the
+    /// next track starts.
+    private var currentArtwork: NSImage?
     private var turntable: TurntableScene
     private var windows: [WallpaperWindow] = []
     private var cancellables: Set<AnyCancellable> = []
@@ -37,8 +40,14 @@ final class WallpaperController {
             self?.apply(playing)
         }
         monitor.onArtwork = { [weak self] image in
-            self?.nowPlaying.update(artwork: image)
-            self?.turntable.setArtwork(image)
+            guard let self else { return }
+            // Take the record off the platter before putting the next one on.
+            if let outgoing = self.currentArtwork, image != nil {
+                self.turntable.setLastPlayed(outgoing)
+            }
+            self.currentArtwork = image
+            self.nowPlaying.update(artwork: image)
+            self.turntable.setArtwork(image)
         }
         monitor.onPermissionDenied = { [weak self] source in
             self?.nowPlaying.denied(source)
