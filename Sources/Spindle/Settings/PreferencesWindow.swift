@@ -3,9 +3,11 @@ import SwiftUI
 
 /// Hosts the settings pane.
 ///
-/// Deliberately dark and fixed-width. Spindle's whole job is a lit room on
-/// your desktop, and a bright system-chrome panel sitting in front of it
-/// looked like a different application.
+/// Built around a large preview rather than a list of controls. The one thing
+/// you come here to do is choose how the desktop looks, so the window shows
+/// that at size and keeps everything else to a strip underneath. It is also
+/// deliberately dark: Spindle's whole job is a lit room on your desktop, and a
+/// bright system-chrome panel in front of it read as a different application.
 final class PreferencesWindowController: NSWindowController {
 
     convenience init(preferences: Preferences,
@@ -22,9 +24,9 @@ final class PreferencesWindowController: NSWindowController {
         window.styleMask = [.titled, .closable, .fullSizeContentView]
         window.isMovableByWindowBackground = true
         window.appearance = NSAppearance(named: .darkAqua)
-        window.backgroundColor = NSColor(srgbRed: 0.063, green: 0.059, blue: 0.055, alpha: 1)
+        window.backgroundColor = NSColor(srgbRed: 0.055, green: 0.052, blue: 0.050, alpha: 1)
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: Theme.windowWidth, height: 670))
+        window.setContentSize(NSSize(width: Theme.windowWidth, height: 664))
         window.center()
         self.init(window: window)
     }
@@ -39,20 +41,23 @@ final class PreferencesWindowController: NSWindowController {
 // MARK: - Theme
 
 private enum Theme {
-    static let windowWidth: CGFloat = 520
+    static let windowWidth: CGFloat = 660
+    /// The preview is 16:9 because the scenes are composed for a screen.
+    static var heroHeight: CGFloat { windowWidth * 9 / 16 }
 
-    static let background = Color(red: 0.063, green: 0.059, blue: 0.055)
-    static let card = Color(red: 0.102, green: 0.096, blue: 0.090)
-    static let cardStroke = Color.white.opacity(0.07)
-    static let divider = Color.white.opacity(0.06)
+    static let background = Color(red: 0.055, green: 0.052, blue: 0.050)
+    static let raised = Color(red: 0.098, green: 0.094, blue: 0.090)
+    static let hairline = Color.white.opacity(0.07)
 
-    static let primary = Color(red: 0.961, green: 0.949, blue: 0.929)
-    static let secondary = Color(red: 0.961, green: 0.949, blue: 0.929).opacity(0.52)
-    static let faint = Color(red: 0.961, green: 0.949, blue: 0.929).opacity(0.30)
+    static let primary = Color(red: 0.964, green: 0.953, blue: 0.933)
+    static let secondary = Color(red: 0.964, green: 0.953, blue: 0.933).opacity(0.54)
+    static let faint = Color(red: 0.964, green: 0.953, blue: 0.933).opacity(0.32)
     /// The amber from the record label on the app icon.
     static let accent = Color(red: 0.886, green: 0.639, blue: 0.290)
+}
 
-    static let cardRadius: CGFloat = 12
+private extension RGB {
+    var color: Color { Color(red: r, green: g, blue: b) }
 }
 
 // MARK: - Root
@@ -65,288 +70,214 @@ struct PreferencesView: View {
     @StateObject private var previews = ScenePreviewCache()
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Wordmark()
-                    .padding(.top, 6)
+        VStack(spacing: 0) {
+            Hero(preset: preferences.preset,
+                 preview: previews.previews[preferences.sceneID],
+                 store: nowPlaying)
 
-                NowPlayingCard(store: nowPlaying,
-                               onRecheckPermissions: onRecheckPermissions)
+            SceneStrip(preferences: preferences, previews: previews)
 
-                ScenePicker(preferences: preferences, previews: previews)
-
-                SettingsCard(preferences: preferences)
-
-                Footer()
+            if let denied = nowPlaying.deniedSource {
+                PermissionBanner(source: denied, onRecheck: onRecheckPermissions)
             }
-            .padding(.horizontal, 22)
-            .padding(.bottom, 22)
+
+            Controls(preferences: preferences)
+
+            Spacer(minLength: 0)
+            Footer()
         }
         .frame(width: Theme.windowWidth)
         .background(Theme.background)
-        .onAppear { previews.loadIfNeeded() }
+        .onAppear { previews.loadIfNeeded(first: preferences.sceneID) }
     }
 }
 
-private struct Wordmark: View {
-    var body: some View {
-        Text("Spindle")
-            .font(.system(size: 30, weight: .regular, design: .serif))
-            .italic()
-            .foregroundStyle(Theme.primary)
-    }
-}
+// MARK: - Hero
 
-// MARK: - Now playing
-
-private struct NowPlayingCard: View {
+/// The selected scene, at size, with everything else written over it.
+private struct Hero: View {
+    let preset: ScenePreset
+    let preview: NSImage?
     @ObservedObject var store: NowPlayingStore
-    let onRecheckPermissions: () -> Void
 
     var body: some View {
-        Card {
-            if let denied = store.deniedSource {
-                permissionNotice(for: denied)
-            } else if let playing = store.playing {
-                playingRow(playing)
+        ZStack(alignment: .bottomLeading) {
+            Group {
+                if let preview {
+                    Image(nsImage: preview)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    // Until the render lands, the scene's own wall and desk.
+                    // A spinner here would just advertise the wait.
+                    LinearGradient(colors: [preset.wallTop.color, preset.deskBase.color],
+                                   startPoint: .top, endPoint: .bottom)
+                }
+            }
+            .frame(width: Theme.windowWidth, height: Theme.heroHeight)
+            .clipped()
+
+            // Scrim, so the caption stays legible over a bright scene.
+            LinearGradient(colors: [.clear, .black.opacity(0.78)],
+                           startPoint: .center, endPoint: .bottom)
+                .frame(height: Theme.heroHeight * 0.55)
+                .allowsHitTesting(false)
+
+            caption
+                .padding(.horizontal, 18)
+                .padding(.bottom, 14)
+        }
+        .frame(width: Theme.windowWidth, height: Theme.heroHeight)
+        .overlay(alignment: .topLeading) {
+            Text("Spindle")
+                .font(.system(size: 19, weight: .regular, design: .serif))
+                .italic()
+                .foregroundStyle(.white.opacity(0.92))
+                .shadow(color: .black.opacity(0.5), radius: 6, y: 1)
+                .padding(.leading, 18)
+                .padding(.top, 14)
+        }
+    }
+
+    private var caption: some View {
+        HStack(alignment: .bottom, spacing: 12) {
+            if let playing = store.playing {
+                Artwork(image: store.artwork, size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(playing.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(playing.isPlaying ? Theme.accent : .white.opacity(0.4))
+                            .frame(width: 4, height: 4)
+                        Text(playing.isPlaying
+                             ? playing.artist
+                             : "\(playing.artist) · paused")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.68))
+                            .lineLimit(1)
+                    }
+                }
             } else {
-                idleRow
-            }
-        }
-    }
-
-    private func playingRow(_ playing: NowPlaying) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            Artwork(image: store.artwork)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(playing.title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.primary)
-                    .lineLimit(1)
-
-                Text(playing.artist)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.secondary)
-                    .lineLimit(1)
-
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(playing.isPlaying ? Theme.accent : Theme.faint)
-                        .frame(width: 5, height: 5)
-                    Text(playing.isPlaying
-                         ? playing.source.displayName
-                         : "\(playing.source.displayName) · paused")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Theme.faint)
+                Artwork(image: store.artwork, size: 40)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Nothing playing")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("Start a track in Music or Spotify")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.62))
                 }
-                .padding(.top, 2)
+            }
 
-                // Ticks on its own so the bar creeps forward between polls
-                // instead of jumping every couple of seconds.
-                TimelineView(.periodic(from: .now, by: 0.5)) { context in
-                    Progress(elapsed: store.elapsed(at: context.date),
-                             duration: playing.duration)
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(preset.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                // Only when it adds something: half the scenes are named
+                // after their palette, and "Clay / CLAY" is just noise.
+                if preset.palette.name != preset.name {
+                    Text(preset.palette.name.uppercased())
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.52))
                 }
-                .padding(.top, 8)
             }
         }
-    }
-
-    private var idleRow: some View {
-        HStack(spacing: 14) {
-            // Standalone still has a sleeve, the generated one, so show it
-            // rather than falling back to the placeholder disc.
-            Artwork(image: store.artwork)
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Nothing playing")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.primary)
-                Text("Start a track in Music or Spotify.")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.secondary)
-            }
-            Spacer(minLength: 0)
-        }
-    }
-
-    private func permissionNotice(for denied: NowPlaying.Source) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "lock.fill")
-                    .foregroundStyle(Theme.accent)
-                Text("Spindle cannot read \(denied.displayName)")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.primary)
-            }
-            Text("Allow it under Privacy & Security › Automation, then re-check.")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: 8) {
-                Button("Open Settings") {
-                    let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!
-                    NSWorkspace.shared.open(url)
-                }
-                Button("Re-check", action: onRecheckPermissions)
-            }
-            .controlSize(.small)
-        }
+        .shadow(color: .black.opacity(0.45), radius: 8, y: 1)
     }
 }
 
 private struct Artwork: View {
     let image: NSImage?
+    var size: CGFloat
 
     var body: some View {
         ZStack {
             if let image {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
+                Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
             } else {
-                Theme.card
+                Color.black.opacity(0.45)
                 Image(systemName: "opticaldisc")
-                    .font(.system(size: 20))
-                    .foregroundStyle(Theme.faint)
+                    .font(.system(size: size * 0.38))
+                    .foregroundStyle(.white.opacity(0.4))
             }
         }
-        .frame(width: 62, height: 62)
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .stroke(Color.white.opacity(0.10), lineWidth: 1)
-        )
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous)
+            .stroke(.white.opacity(0.22), lineWidth: 1))
     }
 }
 
-private struct Progress: View {
-    let elapsed: Double
-    let duration: Double
+// MARK: - Scene strip
 
-    private var fraction: Double {
-        guard duration > 0 else { return 0 }
-        return min(max(elapsed / duration, 0), 1)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.10))
-                    Capsule()
-                        .fill(Theme.accent.opacity(0.85))
-                        .frame(width: geometry.size.width * fraction)
-                }
-            }
-            .frame(height: 3)
-
-            HStack {
-                Text(NowPlaying.timestamp(elapsed))
-                Spacer()
-                Text(NowPlaying.timestamp(duration))
-            }
-            .font(.system(size: 10, design: .monospaced))
-            .foregroundStyle(Theme.faint)
-        }
-    }
-}
-
-// MARK: - Scene picker
-
-private struct ScenePicker: View {
+/// Every scene across one row, like contact prints under an enlarger. All of
+/// them are visible at once; nothing is hidden behind a scroll or a menu.
+private struct SceneStrip: View {
     @ObservedObject var preferences: Preferences
     @ObservedObject var previews: ScenePreviewCache
 
     var body: some View {
-        Card(padding: 14) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Scene")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.primary)
+        HStack(spacing: 6) {
+            ForEach(ScenePreset.all) { preset in
+                Tile(preset: preset,
+                     preview: previews.previews[preset.id],
+                     isSelected: preferences.sceneID == preset.id) {
+                    preferences.sceneID = preset.id
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .background(Theme.raised)
+        .overlay(alignment: .top) { Rectangle().fill(Theme.hairline).frame(height: 1) }
+    }
 
-                HStack(spacing: 10) {
-                    ForEach(ScenePreset.all) { preset in
-                        SceneCard(preset: preset,
-                                  preview: previews.previews[preset.id],
-                                  isSelected: preferences.sceneID == preset.id) {
-                            preferences.sceneID = preset.id
+    private struct Tile: View {
+        let preset: ScenePreset
+        let preview: NSImage?
+        let isSelected: Bool
+        let action: () -> Void
+
+        var body: some View {
+            Button(action: action) {
+                VStack(spacing: 4) {
+                    ZStack {
+                        if let preview {
+                            Image(nsImage: preview).resizable().aspectRatio(contentMode: .fill)
+                        } else {
+                            LinearGradient(colors: [preset.wallTop.color, preset.deskBase.color],
+                                           startPoint: .top, endPoint: .bottom)
                         }
                     }
-                }
+                    .frame(height: 42)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .stroke(isSelected ? Theme.accent : .white.opacity(0.10),
+                                lineWidth: isSelected ? 2 : 1))
 
-                Text(preferences.preset.tagline)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.faint)
-            }
-        }
-    }
-}
-
-private struct SceneCard: View {
-    let preset: ScenePreset
-    let preview: NSImage?
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 0) {
-                ZStack {
-                    if let preview {
-                        Image(nsImage: preview)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else {
-                        // Previews are rendered on launch; until they land,
-                        // show the scene's own wall colour rather than a spinner.
-                        LinearGradient(colors: [swiftColor(preset.wallTop),
-                                                swiftColor(preset.deskBase)],
-                                       startPoint: .top, endPoint: .bottom)
-                    }
-                }
-                .frame(height: 84)
-                .clipped()
-
-                HStack(spacing: 4) {
                     Text(preset.name)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(isSelected ? Theme.primary : Theme.secondary)
+                        .font(.system(size: 9, weight: isSelected ? .semibold : .regular))
+                        .foregroundStyle(isSelected ? Theme.primary : Theme.faint)
                         .lineLimit(1)
-                    Spacer(minLength: 0)
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 11))
-                        .foregroundStyle(isSelected ? Theme.accent : Theme.faint)
+                        .minimumScaleFactor(0.8)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 7)
-                .background(Theme.card)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .stroke(isSelected ? Theme.accent.opacity(0.85) : Theme.cardStroke,
-                            lineWidth: isSelected ? 1.5 : 1)
-            )
+            .buttonStyle(.plain)
+            .help(preset.tagline)
         }
-        .buttonStyle(.plain)
-        .help(preset.tagline)
-    }
-
-    private func swiftColor(_ c: RGB) -> Color {
-        Color(red: c.r, green: c.g, blue: c.b)
     }
 }
 
-// MARK: - Settings rows
+// MARK: - Controls
 
-private struct SettingsCard: View {
+private struct Controls: View {
     @ObservedObject var preferences: Preferences
-
-    /// Read when the window opens rather than continuously: a json dropped in
-    /// the folder should show up, but not at the cost of hitting the disk on
-    /// every redraw.
     @State private var pressings: [Pressing] = PressingLibrary.builtIn()
 
     /// Reads and writes the login-item service directly, so the checkbox can
@@ -357,129 +288,142 @@ private struct SettingsCard: View {
     }
 
     var body: some View {
-        Card(padding: 0) {
-            VStack(spacing: 0) {
-                Row(icon: "record.circle", title: "Pressing") {
-                    HStack(spacing: 7) {
-                        Picker("", selection: $preferences.pressingID) {
-                            ForEach(pressings) { pressing in
-                                Text(pressing.name).tag(pressing.id)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 142)
+        VStack(alignment: .leading, spacing: 14) {
+            pressingRow
 
-                        Button {
-                            guard let url = try? PressingLibrary.directory() else { return }
-                            NSWorkspace.shared.open(url)
-                        } label: {
-                            Image(systemName: "folder")
-                        }
-                        .buttonStyle(.borderless)
-                        .foregroundStyle(Theme.faint)
-                        .help("Add your own records here")
-                    }
-                }
-
-                Row(icon: "textformat", title: "Show track on desktop") {
-                    Toggle("", isOn: $preferences.showTrackInfo).labelsHidden()
-                }
-
-                Row(icon: "pause.circle", title: "Keep turning when paused") {
-                    Toggle("", isOn: $preferences.spinWhenPaused).labelsHidden()
-                }
-
-                Row(icon: "lock.display",
-                    title: "Use on the lock screen",
-                    subtitle: "Sets your desktop picture to a still of this scene.") {
-                    Toggle("", isOn: $preferences.lockScreenBackground).labelsHidden()
-                }
-
-                Row(icon: "power", title: "Open at login", isLast: true) {
-                    Toggle("", isOn: launchAtLogin).labelsHidden()
-                }
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 18),
+                                GridItem(.flexible(), spacing: 18)],
+                      spacing: 10) {
+                Switch(title: "Show track on desktop", isOn: $preferences.showTrackInfo)
+                Switch(title: "Keep turning when paused", isOn: $preferences.spinWhenPaused)
+                Switch(title: "Use on the lock screen",
+                       help: "Sets your desktop picture to a still of this scene.",
+                       isOn: $preferences.lockScreenBackground)
+                Switch(title: "Open at login", isOn: launchAtLogin)
             }
         }
+        .padding(.horizontal, 18)
+        .padding(.top, 16)
+        .padding(.bottom, 4)
         .toggleStyle(.switch)
         .tint(Theme.accent)
-        .onAppear {
-            pressings = PressingLibrary.all()
-            // A record that has since been deleted would otherwise leave the
-            // picker showing nothing at all.
-            if !pressings.contains(where: { $0.id == preferences.pressingID }) {
-                preferences.pressingID = Pressing.black.id
-            }
-        }
+        .onAppear { pressings = PressingLibrary.all() }
     }
-}
 
-private struct Row<Content: View>: View {
-    let icon: String
-    let title: String
-    var subtitle: String? = nil
-    var isLast: Bool = false
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 11) {
-                Image(systemName: icon)
-                    .font(.system(size: 13))
+    /// Pressings as actual discs. A dropdown of colour names is a worse way to
+    /// pick a colour than the colours themselves.
+    private var pressingRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text("PRESSING")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Theme.faint)
-                    .frame(width: 18)
+                Text(PressingLibrary.pressing(id: preferences.pressingID).name)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.secondary)
+                Spacer()
+                Button {
+                    guard let url = try? PressingLibrary.directory() else { return }
+                    NSWorkspace.shared.open(url)
+                } label: {
+                    Label("Add your own", systemImage: "folder")
+                        .font(.system(size: 10))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Theme.faint)
+                .help("Drop a json in the Records folder")
+            }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.primary)
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(.system(size: 11))
-                            .foregroundStyle(Theme.faint)
-                            .fixedSize(horizontal: false, vertical: true)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 30), spacing: 8)],
+                      alignment: .leading, spacing: 8) {
+                ForEach(pressings) { pressing in
+                    Disc(pressing: pressing,
+                         isSelected: preferences.pressingID == pressing.id) {
+                        preferences.pressingID = pressing.id
                     }
                 }
-
-                Spacer(minLength: 12)
-                content
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 11)
-            .frame(minHeight: 46)
+        }
+    }
 
-            if !isLast {
-                Rectangle()
-                    .fill(Theme.divider)
-                    .frame(height: 1)
-                    .padding(.leading, 43)
+    private struct Disc: View {
+        let pressing: Pressing
+        let isSelected: Bool
+        let action: () -> Void
+
+        var body: some View {
+            Button(action: action) {
+                ZStack {
+                    Circle().fill(pressing.color.color)
+                    // The label, so a swatch reads as a record rather than a dot.
+                    Circle().fill(Color.black.opacity(0.55)).frame(width: 9, height: 9)
+                    Circle().fill(Theme.background).frame(width: 2.5, height: 2.5)
+                }
+                .frame(width: 26, height: 26)
+                .overlay(Circle().stroke(isSelected ? Theme.accent : .white.opacity(0.14),
+                                         lineWidth: isSelected ? 2 : 1))
             }
+            .buttonStyle(.plain)
+            .help(pressing.name)
+        }
+    }
+
+    private struct Switch: View {
+        let title: String
+        var help: String?
+        @Binding var isOn: Bool
+
+        var body: some View {
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Spacer(minLength: 4)
+                Toggle("", isOn: $isOn).labelsHidden()
+            }
+            .help(help ?? "")
         }
     }
 }
 
-// MARK: - Shell
+// MARK: - Permission banner
 
-private struct Card<Content: View>: View {
-    var padding: CGFloat = 16
-    @ViewBuilder let content: Content
+private struct PermissionBanner: View {
+    let source: NowPlaying.Source
+    let onRecheck: () -> Void
 
     var body: some View {
-        content
-            .padding(padding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.card.opacity(0.65))
-            .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
-                    .stroke(Theme.cardStroke, lineWidth: 1)
-            )
+        HStack(spacing: 10) {
+            Image(systemName: "lock.fill").foregroundStyle(Theme.accent)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Spindle cannot read \(source.displayName)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.primary)
+                Text("Allow it under Privacy & Security › Automation, then re-check.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.secondary)
+            }
+            Spacer(minLength: 8)
+            Button("Open") {
+                let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!
+                NSWorkspace.shared.open(url)
+            }
+            Button("Re-check", action: onRecheck)
+        }
+        .controlSize(.small)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(Theme.accent.opacity(0.10))
     }
 }
 
+// MARK: - Footer
+
 private struct Footer: View {
-    /// Where the project lives. Clicking the credit opens it.
     private static let author = "svviitzerland"
-    private static let profile = URL(string: "https://github.com/svviitzerland/spindle")!
+    private static let project = URL(string: "https://github.com/svviitzerland/spindle")!
 
     @State private var isHovering = false
 
@@ -490,10 +434,8 @@ private struct Footer: View {
     var body: some View {
         HStack {
             Text("Spindle \(version)")
-
             Spacer()
-
-            Link(destination: Self.profile) {
+            Link(destination: Self.project) {
                 Text("by \(Self.author)")
                     .underline(isHovering)
                     .foregroundStyle(isHovering ? Theme.accent : Theme.faint)
@@ -501,15 +443,15 @@ private struct Footer: View {
             .buttonStyle(.plain)
             .onHover { hovering in
                 isHovering = hovering
-                // A link should admit it is one before you click it. Using
                 // set() rather than push()/pop(), which leaves the cursor
                 // stack unbalanced if the window closes mid-hover.
                 (hovering ? NSCursor.pointingHand : NSCursor.arrow).set()
             }
-            .help(Self.profile.absoluteString)
         }
         .font(.system(size: 10))
         .foregroundStyle(Theme.faint)
-        .padding(.top, 2)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .overlay(alignment: .top) { Rectangle().fill(Theme.hairline).frame(height: 1) }
     }
 }
