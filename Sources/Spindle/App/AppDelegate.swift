@@ -74,7 +74,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                   keyEquivalent: "")
             item.target = self
             item.representedObject = preset.id
-            item.state = preferences.sceneID == preset.id ? .on : .off
+            // Tick whatever is actually on screen, which is not the stored
+            // choice when the clock is driving.
+            item.state = preferences.activePreset.id == preset.id ? .on : .off
             menu.addItem(item)
         }
 
@@ -106,6 +108,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func selectScene(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
+        // Choosing a room by hand is a statement that you want that room, so
+        // it takes the clock out of the loop. The settings window already did
+        // this; the menu did not, and picking from it quietly did nothing.
+        preferences.followsClock = false
         preferences.sceneID = id
     }
 

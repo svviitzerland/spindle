@@ -261,16 +261,25 @@ final class WallpaperController {
             .store(in: &cancellables)
     }
 
-    private func observePreferences() {
-        preferences.$sceneID
+    /// Watch a setting, after it has actually changed.
+    ///
+    /// `@Published` emits in `willSet`, so a sink that reads the property
+    /// back sees the value it had a moment ago. Hopping through the run loop
+    /// puts the read after the write. Every one of these used to fire early,
+    /// which meant choosing a scene applied the one chosen before it.
+    private func onChange<T>(_ publisher: Published<T>.Publisher,
+                             _ handler: @escaping (T) -> Void) {
+        publisher
             .dropFirst()
-            .sink { [weak self] _ in self?.refreshScene() }
+            .receive(on: RunLoop.main)
+            .sink(receiveValue: handler)
             .store(in: &cancellables)
+    }
 
-        preferences.$followsClock
-            .dropFirst()
-            .sink { [weak self] _ in self?.refreshScene() }
-            .store(in: &cancellables)
+    private func observePreferences() {
+        onChange(preferences.$sceneID) { [weak self] _ in self?.refreshScene() }
+
+        onChange(preferences.$followsClock) { [weak self] _ in self?.refreshScene() }
 
         preferences.$pressingID
             .dropFirst()
@@ -294,20 +303,15 @@ final class WallpaperController {
             }
             .store(in: &cancellables)
 
-        preferences.$spinWhenPaused
-            .dropFirst()
-            .sink { [weak self] _ in self?.apply(self?.monitor.current) }
-            .store(in: &cancellables)
+        onChange(preferences.$spinWhenPaused) { [weak self] _ in
+            self?.apply(self?.monitor.current)
+        }
 
-        preferences.$showTrackInfo
-            .dropFirst()
-            .sink { [weak self] _ in self?.applyTrackInfo(self?.monitor.current) }
-            .store(in: &cancellables)
+        onChange(preferences.$showTrackInfo) { [weak self] _ in
+            self?.applyTrackInfo(self?.monitor.current)
+        }
 
-        preferences.$showLyrics
-            .dropFirst()
-            .sink { [weak self] _ in self?.applyLyrics() }
-            .store(in: &cancellables)
+        onChange(preferences.$showLyrics) { [weak self] _ in self?.applyLyrics() }
 
         preferences.$lyricsLookup
             .dropFirst()
