@@ -26,7 +26,7 @@ final class PreferencesWindowController: NSWindowController {
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = NSColor(srgbRed: 0.055, green: 0.052, blue: 0.050, alpha: 1)
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: Theme.windowWidth, height: 664))
+        window.setContentSize(NSSize(width: Theme.windowWidth, height: 694))
         window.center()
         self.init(window: window)
     }
@@ -71,8 +71,9 @@ struct PreferencesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Hero(preset: preferences.preset,
-                 preview: previews.previews[preferences.sceneID],
+            Hero(preset: preferences.activePreset,
+                 preview: previews.previews[preferences.activePreset.id],
+                 isAutomatic: preferences.followsClock,
                  store: nowPlaying)
 
             SceneStrip(preferences: preferences, previews: previews)
@@ -98,6 +99,7 @@ struct PreferencesView: View {
 private struct Hero: View {
     let preset: ScenePreset
     let preview: NSImage?
+    var isAutomatic = false
     @ObservedObject var store: NowPlayingStore
 
     var body: some View {
@@ -175,9 +177,16 @@ private struct Hero: View {
             Spacer(minLength: 8)
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text(preset.name)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white)
+                HStack(spacing: 5) {
+                    if isAutomatic {
+                        Image(systemName: "clock")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    Text(preset.name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
                 // Only when it adds something: half the scenes are named
                 // after their palette, and "Clay / CLAY" is just noise.
                 if preset.palette.name != preset.name {
@@ -221,12 +230,18 @@ private struct SceneStrip: View {
     @ObservedObject var preferences: Preferences
     @ObservedObject var previews: ScenePreviewCache
 
+    private var activeID: String { preferences.activePreset.id }
+
     var body: some View {
         HStack(spacing: 6) {
             ForEach(ScenePreset.all) { preset in
                 Tile(preset: preset,
                      preview: previews.previews[preset.id],
-                     isSelected: preferences.sceneID == preset.id) {
+                     isSelected: activeID == preset.id,
+                     isAutomatic: preferences.followsClock) {
+                    // Choosing a room by hand is a statement that you want
+                    // that room, so it takes the clock out of the loop.
+                    preferences.followsClock = false
                     preferences.sceneID = preset.id
                 }
             }
@@ -241,6 +256,7 @@ private struct SceneStrip: View {
         let preset: ScenePreset
         let preview: NSImage?
         let isSelected: Bool
+        var isAutomatic = false
         let action: () -> Void
 
         var body: some View {
@@ -261,11 +277,18 @@ private struct SceneStrip: View {
                         .stroke(isSelected ? Theme.accent : .white.opacity(0.10),
                                 lineWidth: isSelected ? 2 : 1))
 
-                    Text(preset.name)
-                        .font(.system(size: 9, weight: isSelected ? .semibold : .regular))
-                        .foregroundStyle(isSelected ? Theme.primary : Theme.faint)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                    HStack(spacing: 3) {
+                        if isSelected && isAutomatic {
+                            Image(systemName: "clock")
+                                .font(.system(size: 7, weight: .semibold))
+                                .foregroundStyle(Theme.accent)
+                        }
+                        Text(preset.name)
+                            .font(.system(size: 9, weight: isSelected ? .semibold : .regular))
+                            .foregroundStyle(isSelected ? Theme.primary : Theme.faint)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
                 }
             }
             .buttonStyle(.plain)
@@ -294,6 +317,9 @@ private struct Controls: View {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 18),
                                 GridItem(.flexible(), spacing: 18)],
                       spacing: 10) {
+                Switch(title: "Follow the clock",
+                       help: "Changes the room through the day and moves the sun with it.",
+                       isOn: $preferences.followsClock)
                 Switch(title: "Show track on desktop", isOn: $preferences.showTrackInfo)
                 Switch(title: "Keep turning when paused", isOn: $preferences.spinWhenPaused)
                 Switch(title: "Use on the lock screen",

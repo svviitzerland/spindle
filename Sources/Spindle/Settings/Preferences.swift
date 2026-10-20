@@ -27,6 +27,7 @@ final class Preferences: ObservableObject {
         static let showTrackInfo = "showTrackInfo"
         static let lockScreen = "lockScreenBackground"
         static let pressing = "pressing"
+        static let followsClock = "followsClock"
     }
 
     private let defaults: UserDefaults
@@ -52,7 +53,17 @@ final class Preferences: ObservableObject {
     /// cached, so a json dropped in the Records folder is picked up.
     @Published var pressingID: String { didSet { defaults.set(pressingID, forKey: Key.pressing) } }
 
+    /// Let the hour choose the room, and move the sun through the day.
+    @Published var followsClock: Bool {
+        didSet { defaults.set(followsClock, forKey: Key.followsClock) }
+    }
+
     var preset: ScenePreset { ScenePreset.preset(id: sceneID) }
+
+    /// What should actually be on screen right now.
+    var activePreset: ScenePreset {
+        followsClock ? TimeOfDay.scene() : preset
+    }
     var pressing: Pressing { PressingLibrary.pressing(id: pressingID) }
 
     init(defaults: UserDefaults = .standard) {
@@ -62,6 +73,7 @@ final class Preferences: ObservableObject {
         showTrackInfo = defaults.object(forKey: Key.showTrackInfo) as? Bool ?? true
         lockScreenBackground = defaults.object(forKey: Key.lockScreen) as? Bool ?? false
         pressingID = defaults.string(forKey: Key.pressing) ?? Pressing.black.id
+        followsClock = defaults.object(forKey: Key.followsClock) as? Bool ?? false
     }
 
     // MARK: Launch at login

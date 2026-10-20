@@ -18,6 +18,7 @@ final class WallpaperController {
     private var windows: [WallpaperWindow] = []
     private var cancellables: Set<AnyCancellable> = []
     private var progressTimer: Timer?
+    private var clockTimer: Timer?
 
     /// Raised when an app refuses automation, so the menu can offer a fix.
     var onPermissionDenied: ((NowPlaying.Source) -> Void)?
@@ -25,7 +26,7 @@ final class WallpaperController {
     init(preferences: Preferences = .shared, nowPlaying: NowPlayingStore) {
         self.preferences = preferences
         self.nowPlaying = nowPlaying
-        self.turntable = TurntableScene(preset: preferences.preset,
+        self.turntable = TurntableScene(preset: preferences.activePreset,
                                         seed: Preferences.Fixed.sleeveSeed,
                                         pressing: preferences.pressing)
     }
@@ -62,6 +63,13 @@ final class WallpaperController {
         progressTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in
             self?.advanceTonearm()
         }
+
+        // The sun moves slowly. Five minutes is frequent enough that the room
+        // is never visibly wrong and rare enough to cost nothing.
+        clockTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+            guard let self, self.preferences.followsClock else { return }
+            self.refreshScene()
+        }
         apply(nil)
         refreshLockScreen()
     }
@@ -72,18 +80,27 @@ final class WallpaperController {
     /// When the setting is off this puts back the wallpaper Spindle replaced,
     /// which covers the case of it being switched off while the app was not
     /// running: otherwise our render would be left on the desktop for good.
+    /// Put the right room on screen, which depends on the hour when the
+    /// clock is driving.
+    private func refreshScene() {
+        turntable.apply(preferences.activePreset)
+        refreshLockScreen()
+    }
+
     private func refreshLockScreen() {
         guard preferences.lockScreenBackground else {
             lockScreen.restore()
             return
         }
-        lockScreen.apply(preset: preferences.preset, pressing: preferences.pressing)
+        lockScreen.apply(preset: preferences.activePreset, pressing: preferences.pressing)
     }
 
     func stop() {
         monitor.stop()
         progressTimer?.invalidate()
         progressTimer = nil
+        clockTimer?.invalidate()
+        clockTimer = nil
         windows.forEach { $0.orderOut(nil) }
         windows.removeAll()
     }
@@ -122,11 +139,12 @@ final class WallpaperController {
     private func observePreferences() {
         preferences.$sceneID
             .dropFirst()
-            .sink { [weak self] id in
-                guard let self else { return }
-                self.turntable.apply(ScenePreset.preset(id: id))
-                self.refreshLockScreen()
-            }
+            .sink { [weak self] _ in self?.refreshScene() }
+            .store(in: &cancellables)
+
+        preferences.$followsClock
+            .dropFirst()
+            .sink { [weak self] _ in self?.refreshScene() }
             .store(in: &cancellables)
 
         preferences.$pressingID
