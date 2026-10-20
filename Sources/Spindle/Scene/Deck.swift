@@ -95,11 +95,19 @@ final class Deck {
     let node = SCNNode()
     /// Carries the record and label; this is what turns.
     let spinNode = SCNNode()
+    /// Child of the spin node, tilted a fraction of a degree. Every record is
+    /// warped, and a disc that is perfectly flat while it turns is one of the
+    /// clearest signs that nothing here is real.
+    let warpNode = SCNNode()
     /// Carries the whole arm assembly; its yaw is the tracking angle.
     let tonearmPivot = SCNNode()
     /// Child of the pivot, rotating about the horizontal bearing. This is the
     /// cueing lift: raising it takes the stylus off the record.
     let tonearmLift = SCNNode()
+    /// Child of the lift. Carries the once-per-revolution rise and fall of a
+    /// stylus riding a warped record, kept separate so the wobble and the cue
+    /// are not fighting over the same rotation.
+    let tonearmWarp = SCNNode()
     let labelMaterial: SCNMaterial
 
     private let preset: ScenePreset
@@ -233,6 +241,11 @@ final class Deck {
                                        DeckMetrics.spindle.y)
         node.addChildNode(spinNode)
 
+        // About a quarter of a degree, which lifts the rim roughly half a
+        // millimetre: a mild warp rather than a damaged record.
+        warpNode.eulerAngles = SCNVector3(0.0040, 0, 0.0023)
+        spinNode.addChildNode(warpNode)
+
         let vinyl = Materials.vinyl(pressing)
         let edge = Materials.vinylEdge(pressing)
 
@@ -243,7 +256,7 @@ final class Deck {
         let recordNode = SCNNode(geometry: record)
         recordNode.position = SCNVector3(0, DeckMetrics.recordThickness / 2, 0)
         recordNode.castsShadow = true
-        spinNode.addChildNode(recordNode)
+        warpNode.addChildNode(recordNode)
 
         // The raised outer rim and the raised land around the label: a record
         // only touches the mat at those two rings, and the highlight they catch
@@ -256,7 +269,7 @@ final class Deck {
             ring.firstMaterial = vinyl
             let ringNode = SCNNode(geometry: ring)
             ringNode.position = SCNVector3(0, DeckMetrics.recordThickness, 0)
-            spinNode.addChildNode(ringNode)
+            warpNode.addChildNode(ringNode)
         }
 
         let label = SCNCylinder(radius: DeckMetrics.labelRadius, height: 0.0005)
@@ -265,14 +278,14 @@ final class Deck {
         label.materials = [labelEdge, labelMaterial, labelMaterial]
         let labelNode = SCNNode(geometry: label)
         labelNode.position = SCNVector3(0, DeckMetrics.recordThickness + 0.00025, 0)
-        spinNode.addChildNode(labelNode)
+        warpNode.addChildNode(labelNode)
 
         // Spindle pin, and the hole it passes through.
         let hole = SCNCylinder(radius: 0.0037, height: 0.0012)
         hole.firstMaterial = Materials.plastic(RGB(0.02, 0.02, 0.02), gloss: 0.1)
         let holeNode = SCNNode(geometry: hole)
         holeNode.position = SCNVector3(0, DeckMetrics.recordThickness, 0)
-        spinNode.addChildNode(holeNode)
+        warpNode.addChildNode(holeNode)
 
         let pin = SCNCylinder(radius: 0.0034, height: 0.0165)
         pin.radialSegmentCount = 24
@@ -354,8 +367,9 @@ final class Deck {
         // rotates this node rather than moving parts individually.
         tonearmLift.position = SCNVector3(0, 0.0015, 0)
         tonearmPivot.addChildNode(tonearmLift)
+        tonearmLift.addChildNode(tonearmWarp)
 
-        addArmTube(to: tonearmLift, tube: tube, dark: dark, housing: housing)
+        addArmTube(to: tonearmWarp, tube: tube, dark: dark, housing: housing)
         addArmRest(base: base, tube: tube, dark: dark, housing: housing)
         addAntiSkate(base: base, tube: tube, housing: housing)
         addCueingLever(base: base, tube: tube, dark: dark)

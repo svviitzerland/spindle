@@ -47,7 +47,9 @@ final class TurntableScene {
     // MARK: Public controls
 
     func apply(_ newPreset: ScenePreset) {
-        guard newPreset.id != preset.id else { return }
+        // Compared whole, not by id: following the clock moves the sun within
+        // a room, so the same scene can genuinely need rebuilding.
+        guard newPreset != preset else { return }
         preset = newPreset
         rebuild()
     }
@@ -81,15 +83,90 @@ final class TurntableScene {
         stackCoverMaterial?.diffuse.contents = image
     }
 
+    /// Start or stop the platter.
+    ///
+    /// A platter has mass. It does not arrive at 33 1/3 the instant the motor
+    /// is switched on, and it does not stop dead when the motor cuts: the belt
+    /// brings it up over a second or so, and a heavy platter then coasts for
+    /// several more. Snapping between nothing and full speed was one of the
+    /// clearest signs that none of this was a real machine.
     func setSpinning(_ spinning: Bool) {
+        guard spinning != isSpinning else { return }
         isSpinning = spinning
-        deck.spinNode.removeAction(forKey: "spin")
-        guard spinning else { return }
-        let turn = SCNAction.rotateBy(x: 0, y: -.pi * 2, z: 0,
-                                      duration: TimeInterval(60.0 / rpm))
-        turn.timingMode = .linear
-        deck.spinNode.runAction(.repeatForever(turn), forKey: "spin")
+        deck.spinNode.removeAction(forKey: Self.spinKey)
+        if spinning {
+            runSpinUp()
+        } else {
+            runCoastDown()
+        }
+        setWarpWobble(spinning)
     }
+
+    private static let spinKey = "spin"
+
+    /// Angular speed in radians per second.
+    private var targetSpeed: CGFloat { 2 * .pi * rpm / 60 }
+
+    /// Belt drive: speed approaches the target exponentially, so the angle is
+    /// the integral of that approach rather than a straight ramp.
+    private func runSpinUp() {
+        let omega = targetSpeed
+        let tau = Self.spinUpTau
+        let start = deck.spinNode.eulerAngles.y
+
+        let ramp = SCNAction.customAction(duration: tau * 5) { node, elapsed in
+            let t = TimeInterval(elapsed)
+            let turned = omega * CGFloat(t - tau * (1 - exp(-t / tau)))
+            node.eulerAngles.y = start - turned
+        }
+
+        deck.spinNode.runAction(ramp, forKey: Self.spinKey) { [weak self] in
+            guard let self, self.isSpinning else { return }
+            // Close enough to speed now; hand over to a constant turn.
+            let turn = SCNAction.rotateBy(x: 0, y: -.pi * 2, z: 0,
+                                          duration: TimeInterval(60 / self.rpm))
+            turn.timingMode = .linear
+            self.deck.spinNode.runAction(.repeatForever(turn), forKey: Self.spinKey)
+        }
+    }
+
+    /// Free-wheeling: friction alone, so speed decays and the platter creeps
+    /// to a halt rather than stopping on the beat.
+    private func runCoastDown() {
+        let omega = targetSpeed
+        let tau = Self.coastTau
+        let start = deck.spinNode.eulerAngles.y
+
+        let coast = SCNAction.customAction(duration: tau * 4) { node, elapsed in
+            let t = TimeInterval(elapsed)
+            let turned = omega * CGFloat(tau * (1 - exp(-t / tau)))
+            node.eulerAngles.y = start - turned
+        }
+        deck.spinNode.runAction(coast, forKey: Self.spinKey)
+    }
+
+    /// The stylus riding the warp, once per revolution.
+    private func setWarpWobble(_ on: Bool) {
+        deck.tonearmWarp.removeAction(forKey: Self.warpKey)
+        guard on else {
+            deck.tonearmWarp.eulerAngles.x = 0
+            return
+        }
+        let period = TimeInterval(60 / rpm)
+        let bob = SCNAction.customAction(duration: period) { node, elapsed in
+            let phase = Double(elapsed) / period * 2 * .pi
+            node.eulerAngles.x = Self.warpAmplitude * CGFloat(sin(phase))
+        }
+        deck.tonearmWarp.runAction(.repeatForever(bob), forKey: Self.warpKey)
+    }
+
+    private static let warpKey = "warp"
+    /// How far the arm rises on the high side of the warp.
+    private static let warpAmplitude: CGFloat = 0.0022
+    /// How quickly the belt brings the platter up to speed.
+    private static let spinUpTau: TimeInterval = 0.62
+    /// How long the platter free-wheels once the motor cuts.
+    private static let coastTau: TimeInterval = 1.45
 
     func setRPM(_ value: CGFloat) {
         rpm = max(1, value)
@@ -126,8 +203,18 @@ final class TurntableScene {
             return
         }
         SCNTransaction.begin()
-        SCNTransaction.animationDuration = 0.45
-        SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        // A cueing lever is a viscous damper. It lifts briskly and settles,
+        // and lowers slowly: the whole point of the mechanism is that the
+        // stylus is never dropped onto the record.
+        if lifted {
+            SCNTransaction.animationDuration = 0.42
+            SCNTransaction.animationTimingFunction =
+                CAMediaTimingFunction(controlPoints: 0.22, 0.86, 0.36, 1.0)
+        } else {
+            SCNTransaction.animationDuration = 1.15
+            SCNTransaction.animationTimingFunction =
+                CAMediaTimingFunction(controlPoints: 0.45, 0.02, 0.70, 0.62)
+        }
         deck.tonearmLift.eulerAngles.x = angle
         SCNTransaction.commit()
     }
@@ -204,6 +291,9 @@ final class TurntableScene {
         camera.grainIntensity = 0.26
         camera.grainScale = 1.2
         camera.grainIsColored = false
+        // A record turning at 33 rpm smears at the rim. Only the live view
+        // sees this: a still has no previous frame to blur against.
+        camera.motionBlurIntensity = 1.1
 
         // Contact shadows, without which nothing sits on the desk.
         camera.screenSpaceAmbientOcclusionIntensity = 1.9
