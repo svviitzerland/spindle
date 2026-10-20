@@ -27,6 +27,14 @@ jobs:
           VERSION="${{ github.event.inputs.version || github.ref_name }}"
           echo "tag=$VERSION"              >> "$GITHUB_OUTPUT"
           echo "number=${VERSION#v}"       >> "$GITHUB_OUTPUT"
+          # A semver pre-release tag carries a hyphen: v0.1.0-beta.1. Those
+          # publish as pre-releases so they never become the download the
+          # front of the repository points at.
+          if [[ "$VERSION" == *-* ]]; then
+            echo "prerelease=true"         >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false"        >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build for Apple Silicon and Intel
         run: make universal
@@ -92,24 +100,44 @@ jobs:
           xcrun stapler staple "$DMG"
 
       - name: Write the install notes
+        env:
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
         run: |
           cat > "$RUNNER_TEMP/notes.md" <<'NOTES'
           ### Install
 
           Download the disk image, open it, and drag Spindle to Applications.
 
-          Spindle lives in the menu bar — there is no Dock icon and no window.
+          Spindle lives in the menu bar. There is no Dock icon and no window.
           On first launch macOS asks whether Spindle may control Music or
           Spotify; that is how it reads the track and the cover art.
+
+          The build is signed ad-hoc rather than with a Developer ID, so
+          Gatekeeper will object the first time. Right-click Spindle and
+          choose Open.
           NOTES
+
+          if [ "$PRERELEASE" = "true" ]; then
+            cat >> "$RUNNER_TEMP/notes.md" <<'NOTES'
+
+          ### This is a pre-release
+
+          Published for trying out rather than relying on. Expect rough edges,
+          and please open an issue for anything that looks wrong.
+          NOTES
+          fi
 
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
           DMG: dist/Spindle-${{ steps.version.outputs.number }}.dmg
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
         run: |
+          FLAGS=""
+          if [ "$PRERELEASE" = "true" ]; then FLAGS="--prerelease"; fi
+          # shellcheck disable=SC2086
           gh release create "$TAG" "$DMG" \
             --title "Spindle $TAG" \
             --notes-file "$RUNNER_TEMP/notes.md" \
-            --generate-notes
+            --generate-notes $FLAGS
