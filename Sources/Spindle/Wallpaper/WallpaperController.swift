@@ -20,6 +20,7 @@ final class WallpaperController {
     private var cancellables: Set<AnyCancellable> = []
     private var progressTimer: Timer?
     private var clockTimer: Timer?
+    private var lyricsTimer: Timer?
 
     /// Raised when an app refuses automation, so the menu can offer a fix.
     var onPermissionDenied: ((NowPlaying.Source) -> Void)?
@@ -70,6 +71,13 @@ final class WallpaperController {
             self?.advanceTonearm()
         }
 
+        // Lyric lines turn over every two or three seconds, so they get their
+        // own beat. Sharing the tonearm's four-second tick skipped lines.
+        lyricsTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self, self.preferences.showLyrics else { return }
+            self.applyLyrics()
+        }
+
         // The sun moves slowly. Five minutes is frequent enough that the room
         // is never visibly wrong and rare enough to cost nothing.
         clockTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
@@ -107,6 +115,8 @@ final class WallpaperController {
         progressTimer = nil
         clockTimer?.invalidate()
         clockTimer = nil
+        lyricsTimer?.invalidate()
+        lyricsTimer = nil
         windows.forEach { $0.orderOut(nil) }
         windows.removeAll()
     }
@@ -246,6 +256,5 @@ final class WallpaperController {
     private func advanceTonearm() {
         guard let playing = monitor.current, playing.isPlaying else { return }
         turntable.setProgress(playing.interpolatedProgress())
-        applyLyrics()
     }
 }

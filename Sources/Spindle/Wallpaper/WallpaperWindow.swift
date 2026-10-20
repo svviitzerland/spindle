@@ -67,6 +67,23 @@ final class WallpaperWindow: NSWindow {
         applyLyricsPlacement(in: screen)
 
         setFrame(screen.frame, display: true)
+
+        // Stop drawing a room nobody can see. The desktop spends most of its
+        // life completely covered by other windows, and rendering a 3-D scene
+        // behind them is the single largest thing Spindle costs.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(occlusionChanged),
+            name: NSWindow.didChangeOcclusionStateNotification, object: self)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func occlusionChanged() {
+        let visible = occlusionState.contains(.visible)
+        sceneView.rendersContinuously = visible
+        sceneView.isPlaying = visible
     }
 
     override var canBecomeKey: Bool { false }
@@ -146,6 +163,8 @@ private final class LyricsView: NSView {
     private let current = NSTextField(labelWithString: "")
     private let next = NSTextField(labelWithString: "")
     private let stack: NSStackView
+    private var lastSignature: [String] = []
+    private var lastAlignment: TextPlacement.Alignment?
 
     init() {
         stack = NSStackView(views: [previous, current, next])
@@ -188,6 +207,13 @@ private final class LyricsView: NSView {
 
     func apply(_ window: (before: String?, current: String, after: String?),
                alignment: TextPlacement.Alignment) {
+        // Called every second, but a line lasts several. Redrawing text that
+        // has not changed is work for nothing.
+        let signature = [window.before ?? "", window.current, window.after ?? ""]
+        guard signature != lastSignature || alignment != lastAlignment else { return }
+        lastSignature = signature
+        lastAlignment = alignment
+
         previous.stringValue = window.before ?? ""
         current.stringValue = window.current
         next.stringValue = window.after ?? ""
