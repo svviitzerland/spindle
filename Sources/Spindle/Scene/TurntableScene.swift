@@ -442,10 +442,10 @@ final class TurntableScene {
                 : props.sleeve(artwork: artwork)
             sleeveMaterial = sleeve.material
             if dressing.sleeveStand {
-                sleeve.node.position = SCNVector3(-0.368, 0, -0.215)
+                sleeve.node.position = SCNVector3(-0.425, 0, -0.215)
                 sleeve.node.eulerAngles = SCNVector3(0, 0.10, 0)
             } else {
-                sleeve.node.position = SCNVector3(-0.352, 0.160, -0.165)
+                sleeve.node.position = SCNVector3(-0.400, 0.160, -0.175)
                 sleeve.node.eulerAngles = SCNVector3(-0.125, 0.36, 0.02)
             }
             world.addChildNode(sleeve.node)
@@ -462,25 +462,25 @@ final class TurntableScene {
             if let lastPlayedArtwork {
                 stack.topCover.diffuse.contents = lastPlayedArtwork
             }
-            stack.node.position = SCNVector3(0.395, 0, 0.165)
+            stack.node.position = SCNVector3(0.478, 0, 0.192)
             stack.node.eulerAngles = SCNVector3(0, -0.44, 0)
             world.addChildNode(stack.node)
         }
         if dressing.mug {
             let mug = props.mug()
-            mug.position = SCNVector3(-0.258, 0, -0.218)
+            mug.position = SCNVector3(-0.332, 0, 0.118)
             // Handle roughly side on, which reads from either side of the room.
             mug.eulerAngles = SCNVector3(0, 2.25, 0)
             world.addChildNode(mug)
         }
         if dressing.plant {
             let plant = props.plant()
-            plant.position = SCNVector3(-0.600, 0, -0.195)
+            plant.position = SCNVector3(-0.690, 0, -0.205)
             world.addChildNode(plant)
         }
         if dressing.bigPlant {
             let plant = props.bigPlant()
-            plant.position = SCNVector3(0.605, 0, -0.230)
+            plant.position = SCNVector3(0.648, 0, -0.238)
             plant.eulerAngles = SCNVector3(0, 0.6, 0)
             world.addChildNode(plant)
         }
@@ -492,7 +492,7 @@ final class TurntableScene {
         }
         if dressing.headphones {
             let cans = props.headphones()
-            cans.position = SCNVector3(-0.470, 0, -0.230)
+            cans.position = SCNVector3(-0.512, 0, 0.150)
             cans.eulerAngles = SCNVector3(0, 0.95, 0)
             world.addChildNode(cans)
         }
