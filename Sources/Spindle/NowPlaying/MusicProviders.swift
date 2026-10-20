@@ -1,6 +1,16 @@
 import AppKit
 import Foundation
 
+/// Read a number out of an AppleScript result.
+///
+/// AppleScript formats reals with the system's decimal separator, so on a
+/// machine set to a comma locale `player position` comes back as "12,345" and
+/// `Double()` refuses it. That silently became zero, which pinned the tonearm
+/// to the lead-in groove and held lyrics on the first line forever.
+func appleScriptNumber(_ text: String) -> Double? {
+    Double(text.replacingOccurrences(of: ",", with: "."))
+}
+
 /// A source Spindle can ask "what is playing?".
 protocol MusicProvider {
     var source: NowPlaying.Source { get }
@@ -53,12 +63,12 @@ struct SpotifyProvider: MusicProvider {
         let fields = text.components(separatedBy: "\n")
         guard fields.count >= 6 else { return nil }
         // Spotify reports track length in milliseconds.
-        let duration = (Double(fields[3]) ?? 0) / 1000.0
+        let duration = (appleScriptNumber(fields[3]) ?? 0) / 1000.0
         return NowPlaying(title: fields[0],
                           artist: fields[1],
                           album: fields[2],
                           duration: duration,
-                          position: Double(fields[4]) ?? 0,
+                          position: appleScriptNumber(fields[4]) ?? 0,
                           isPlaying: fields[5].lowercased().contains("playing"),
                           source: source)
     }
@@ -126,8 +136,8 @@ struct AppleMusicProvider: MusicProvider {
         return NowPlaying(title: fields[0],
                           artist: fields[1],
                           album: fields[2],
-                          duration: Double(fields[3]) ?? 0,
-                          position: Double(fields[4]) ?? 0,
+                          duration: appleScriptNumber(fields[3]) ?? 0,
+                          position: appleScriptNumber(fields[4]) ?? 0,
                           isPlaying: fields[5].lowercased().contains("playing"),
                           source: source)
     }
