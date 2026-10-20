@@ -321,8 +321,9 @@ private struct Controls: View {
                        help: "Changes the room through the day and moves the sun with it.",
                        isOn: $preferences.followsClock)
                 Switch(title: "Show track on desktop", isOn: $preferences.showTrackInfo)
-                Switch(title: "Show lyrics",
-                       help: "From your Music library, if a track has any stored.",
+                Switch(title: "Show lyrics (experimental)",
+                       help: "From your Music library, if a track has any stored. "
+                           + "Coverage and timing vary by track.",
                        isOn: $preferences.showLyrics)
                 Switch(title: "Look lyrics up online",
                        help: "Sends the track name, artist, album and length to "

@@ -19,7 +19,7 @@ The platter spins while the track plays, and stops when you pause.
 * Eight scenes to pick from
 * Coloured pressings, and you can add your own
 * Can match your lock screen too
-* Lyrics, in sync, in a place chosen for each scene
+* Lyrics, in sync, in a place chosen for each scene (experimental)
 * Lives in the menu bar and stays out of the way
 * Free and open source
 
@@ -50,6 +50,9 @@ Nothing leaves your Mac unless you turn on **Look lyrics up online**, which
 sends the track name, artist, album and length to `lrclib.net` so it can find
 the words. That setting is off until you switch it on, and it is the only
 thing in Spindle that talks to anything.
+
+Lyrics are marked experimental: whether a track has any, and whether the lines
+are timed, depends entirely on what the database holds for it.
 
 ## Build from source
 
