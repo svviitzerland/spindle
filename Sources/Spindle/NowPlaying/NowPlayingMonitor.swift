@@ -20,7 +20,12 @@ final class NowPlayingMonitor {
     /// Called once if macOS refuses the Apple Events permission.
     var onPermissionDenied: ((NowPlaying.Source) -> Void)?
 
+    /// Whether to look lyrics up by name when the app has none of its own.
+    /// Owned by preferences; the monitor is told rather than asking.
+    var looksUpLyrics = false
+
     private let bridge = AppleScriptBridge()
+    private let lyricsService = LyricsService()
     private let providers: [MusicProvider]
     private let work = DispatchQueue(label: "com.spindle.nowplaying", qos: .utility)
     private var timer: DispatchSourceTimer?
@@ -112,13 +117,21 @@ final class NowPlayingMonitor {
         guard let provider = providers.first(where: { $0.source == playing.source }) else {
             return nil
         }
+        // What the app itself holds, which costs nothing and leaves the
+        // machine untouched.
         do {
-            guard let text = try provider.lyrics() else { return nil }
-            return Lyrics(text: text, trackKey: playing.trackKey)
+            if let text = try provider.lyrics(),
+               let local = Lyrics(text: text, trackKey: playing.trackKey) {
+                return local
+            }
         } catch {
             note(error, from: playing.source)
-            return nil
         }
+
+        // Then, only if asked, look them up by name. This is where Spotify
+        // gets lyrics at all, and where anything gets timed ones.
+        guard looksUpLyrics else { return nil }
+        return lyricsService.lyrics(for: playing)
     }
 
     /// Log once per source, and stop pestering an app that said no.

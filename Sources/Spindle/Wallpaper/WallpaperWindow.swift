@@ -93,10 +93,11 @@ final class WallpaperWindow: NSWindow {
         applyLyricsPlacement(in: screen ?? self.screen ?? NSScreen.main!)
     }
 
-    func setLyrics(_ lyrics: Lyrics?, progress: Double, visible: Bool) {
+    func setLyrics(_ lyrics: Lyrics?, elapsed: TimeInterval, duration: TimeInterval,
+                   visible: Bool) {
         lyricsView.isHidden = !visible || lyrics == nil
         guard let lyrics else { return }
-        lyricsView.apply(lyrics.window(atProgress: progress),
+        lyricsView.apply(lyrics.window(elapsed: elapsed, duration: duration),
                          alignment: lyricsPlacement.alignment)
     }
 

@@ -61,6 +61,7 @@ final class WallpaperController {
             self?.nowPlaying.denied(source)
             self?.onPermissionDenied?(source)
         }
+        monitor.looksUpLyrics = preferences.lyricsLookup
         monitor.start(interval: Preferences.Fixed.pollInterval)
 
         // The tonearm creeps inward between polls rather than jumping every
@@ -189,6 +190,15 @@ final class WallpaperController {
             .dropFirst()
             .sink { [weak self] _ in self?.applyLyrics() }
             .store(in: &cancellables)
+
+        preferences.$lyricsLookup
+            .dropFirst()
+            .sink { [weak self] enabled in
+                guard let self else { return }
+                self.monitor.looksUpLyrics = enabled
+                self.monitor.forceRefresh()
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: Reacting to playback
@@ -221,11 +231,15 @@ final class WallpaperController {
     /// The line is estimated from elapsed time, so this is refreshed on the
     /// same beat as the tonearm rather than only when the track changes.
     private func applyLyrics() {
-        let progress = monitor.current?.interpolatedProgress() ?? 0
-        let visible = preferences.showLyrics && monitor.current?.isPlaying == true
+        let playing = monitor.current
+        // Timed lyrics are followed against the clock, so they need seconds
+        // rather than a fraction of the track.
+        let elapsed = playing.map { $0.interpolatedProgress() * $0.duration } ?? 0
+        let visible = preferences.showLyrics && playing?.isPlaying == true
         windows.forEach {
             $0.setLyricsPlacement(preferences.activePreset.lyrics, screen: $0.screen)
-            $0.setLyrics(currentLyrics, progress: progress, visible: visible)
+            $0.setLyrics(currentLyrics, elapsed: elapsed,
+                         duration: playing?.duration ?? 0, visible: visible)
         }
     }
 

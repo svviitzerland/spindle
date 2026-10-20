@@ -26,7 +26,7 @@ final class PreferencesWindowController: NSWindowController {
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = NSColor(srgbRed: 0.055, green: 0.052, blue: 0.050, alpha: 1)
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: Theme.windowWidth, height: 718))
+        window.setContentSize(NSSize(width: Theme.windowWidth, height: 742))
         window.center()
         self.init(window: window)
     }
@@ -322,8 +322,13 @@ private struct Controls: View {
                        isOn: $preferences.followsClock)
                 Switch(title: "Show track on desktop", isOn: $preferences.showTrackInfo)
                 Switch(title: "Show lyrics",
-                       help: "From your Music library. Spotify does not provide any.",
+                       help: "From your Music library, if a track has any stored.",
                        isOn: $preferences.showLyrics)
+                Switch(title: "Look lyrics up online",
+                       help: "Sends the track name, artist, album and length to "
+                           + "lrclib.net. The only thing Spindle ever sends anywhere, "
+                           + "and how Spotify gets lyrics at all.",
+                       isOn: $preferences.lyricsLookup)
                 Switch(title: "Keep turning when paused", isOn: $preferences.spinWhenPaused)
                 Switch(title: "Use on the lock screen",
                        help: "Sets your desktop picture to a still of this scene.",
