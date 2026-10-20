@@ -40,7 +40,6 @@ SHAPES = {
     "stack":        ("rect", 0.158, 0.158),
     "books":        ("rect", 0.078, 0.108),
     "leaningFrame": ("rect", 0.128, 0.030),
-    "mug":          ("circle", 0.070),
     # Pots, not foliage. Leaves drape over things and are meant to; a pot
     # standing inside a sleeve stand is the bug. Checking the leaf spread
     # pushed the planting out of frame to satisfy a collision that was never

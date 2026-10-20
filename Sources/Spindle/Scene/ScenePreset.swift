@@ -222,7 +222,6 @@ extension ScenePreset {
         /// A framed print standing on the desk.
         var leaningFrame = false
         var lamp = false
-        var mug = false
         var plant = false
         /// A second, larger plant. For rooms where the green is the point.
         var bigPlant = false

@@ -3,8 +3,8 @@ import SceneKit
 
 /// Everything on the desk that is not the turntable.
 ///
-/// A deck alone on a clean surface reads as a product shot. The mug, the
-/// plant, the books someone stacked badly — that is what makes it a room
+/// A deck alone on a clean surface reads as a product shot. The plant, the
+/// books someone stacked badly — that is what makes it a room
 /// somebody uses. All of it is built from primitives and procedural artwork,
 /// so the repository still carries no assets.
 struct Props {
@@ -192,65 +192,6 @@ struct Props {
             node.eulerAngles.x = restX + amplitude * 0.45 * CGFloat(sin(t * 0.73 + 1.1))
         }
         leaf.runAction(.repeatForever(drift))
-    }
-
-    // MARK: Mug
-
-    /// Glazed ceramic, with coffee in it. The handle is a torus clipped by
-    /// being half-buried in the body, which is cheaper than a real sweep and
-    /// indistinguishable at this size.
-    func mug() -> SCNNode {
-        let mug = SCNNode()
-        let glaze = Materials.ceramic(RGB(0.60, 0.575, 0.535))
-        glaze.isDoubleSided = true
-
-        // A solid body, not a tube.
-        //
-        // An SCNTube is hollow the whole way through, and with single-sided
-        // materials its inner wall is culled, so from outside you see a bare
-        // curve of the outer wall with nothing behind it and no bottom. It
-        // read as a curled sheet of paper rather than a mug.
-        let body = SCNCylinder(radius: 0.042, height: 0.094)
-        body.radialSegmentCount = 56
-        body.materials = [glaze, glaze, glaze]
-        let bodyNode = SCNNode(geometry: body)
-        bodyNode.position = SCNVector3(0, 0.047, 0)
-        bodyNode.castsShadow = true
-        mug.addChildNode(bodyNode)
-
-        // The lip, which is what tells you it is open at the top.
-        let rim = SCNTorus(ringRadius: 0.0415, pipeRadius: 0.0034)
-        rim.ringSegmentCount = 56
-        rim.pipeSegmentCount = 14
-        rim.firstMaterial = glaze
-        let rimNode = SCNNode(geometry: rim)
-        rimNode.position = SCNVector3(0, 0.0938, 0)
-        mug.addChildNode(rimNode)
-
-        let handle = SCNTorus(ringRadius: 0.026, pipeRadius: 0.0062)
-        handle.ringSegmentCount = 40
-        handle.pipeSegmentCount = 16
-        handle.firstMaterial = glaze
-        let handleNode = SCNNode(geometry: handle)
-        handleNode.eulerAngles = SCNVector3(CGFloat.pi / 2, 0, 0)
-        handleNode.position = SCNVector3(0.058, 0.052, 0)
-        handleNode.castsShadow = true
-        mug.addChildNode(handleNode)
-
-        // Coffee, set down inside the rim so the mug has a depth to it.
-        let coffee = SCNCylinder(radius: 0.0398, height: 0.002)
-        coffee.radialSegmentCount = 56
-        let liquid = SCNMaterial()
-        liquid.lightingModel = .physicallyBased
-        liquid.diffuse.contents = Textures.solid(RGB(0.055, 0.030, 0.018))
-        liquid.roughness.contents = 0.06
-        liquid.metalness.contents = 0.0
-        coffee.materials = [liquid, liquid, liquid]
-        let coffeeNode = SCNNode(geometry: coffee)
-        coffeeNode.position = SCNVector3(0, 0.0858, 0)
-        mug.addChildNode(coffeeNode)
-
-        return mug
     }
 
     // MARK: Plant

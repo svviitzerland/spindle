@@ -466,13 +466,6 @@ final class TurntableScene {
             stack.node.eulerAngles = SCNVector3(0, -0.44, 0)
             world.addChildNode(stack.node)
         }
-        if dressing.mug {
-            let mug = props.mug()
-            mug.position = SCNVector3(-0.332, 0, 0.118)
-            // Handle roughly side on, which reads from either side of the room.
-            mug.eulerAngles = SCNVector3(0, 2.25, 0)
-            world.addChildNode(mug)
-        }
         if dressing.plant {
             let plant = props.plant()
             plant.position = SCNVector3(-0.690, 0, -0.205)

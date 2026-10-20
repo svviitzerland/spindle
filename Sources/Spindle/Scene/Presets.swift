@@ -35,7 +35,7 @@ extension ScenePreset {
         // The deck sits right of centre with the sleeve beside it; the wall
         // above and left of both is the only space wide enough.
         lyrics: TextPlacement(x: 0.055, y: 0.125, alignment: .leading),
-        dressing: .init(sleeve: true, stack: true, mug: true, plant: true, books: true),
+        dressing: .init(sleeve: true, stack: true, plant: true, books: true),
         dustCount: 90
     )
 
@@ -96,7 +96,7 @@ extension ScenePreset {
         // The camera is round to the left here, which pushes the deck right
         // and leaves the upper wall open.
         lyrics: TextPlacement(x: 0.058, y: 0.115, alignment: .leading),
-        dressing: .init(sleeve: true, sleeveStand: true, mug: true, plant: true, books: true),
+        dressing: .init(sleeve: true, sleeveStand: true, plant: true, books: true),
         dustCount: 85
     )
 
@@ -129,8 +129,7 @@ extension ScenePreset {
         // Sleeve and planting take the left of frame, so the text crosses to
         // the bare clay on the right.
         lyrics: TextPlacement(x: 0.945, y: 0.125, alignment: .trailing),
-        dressing: .init(sleeve: true, sleeveStand: true, mug: true,
-                        plant: true, bigPlant: true),
+        dressing: .init(sleeve: true, sleeveStand: true, plant: true, bigPlant: true),
         dustCount: 110
     )
 
@@ -160,8 +159,7 @@ extension ScenePreset {
         bloom: 0.08,
         // Planting on both sides. The gap is the middle of the wall.
         lyrics: TextPlacement(x: 0.5, y: 0.1, alignment: .center),
-        dressing: .init(sleeve: true, sleeveStand: true, mug: true,
-                        plant: true, bigPlant: true),
+        dressing: .init(sleeve: true, sleeveStand: true, plant: true, bigPlant: true),
         dustCount: 60
     )
 
@@ -282,7 +280,7 @@ extension ScenePreset {
         // No wall at all from up here; the bare desk to the left of the deck
         // is the only clear ground.
         lyrics: TextPlacement(x: 0.045, y: 0.2, alignment: .leading),
-        dressing: .init(wall: false, sleeve: false, mug: true),
+        dressing: .init(wall: false, sleeve: false),
         dustCount: 40
     )
 }
