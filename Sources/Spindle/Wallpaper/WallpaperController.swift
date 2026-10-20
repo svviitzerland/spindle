@@ -21,6 +21,9 @@ final class WallpaperController {
     private var progressTimer: Timer?
     private var clockTimer: Timer?
     private var lyricsTimer: Timer?
+    private var settleTimer: Timer?
+    private var powerTimer: Timer?
+    private var policy = RenderPolicy()
 
     /// Raised when an app refuses automation, so the menu can offer a fix.
     var onPermissionDenied: ((NowPlaying.Source) -> Void)?
@@ -71,6 +74,9 @@ final class WallpaperController {
             self?.advanceTonearm()
         }
 
+        observeEnergy()
+        updateRenderMode()
+
         // Lyric lines turn over every two or three seconds, so they get their
         // own beat. Sharing the tonearm's four-second tick skipped lines.
         lyricsTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
@@ -94,11 +100,104 @@ final class WallpaperController {
     /// When the setting is off this puts back the wallpaper Spindle replaced,
     /// which covers the case of it being switched off while the app was not
     /// running: otherwise our render would be left on the desktop for good.
+    // MARK: Energy
+
+    /// Everything that decides whether the scene needs drawing at all.
+    private func observeEnergy() {
+        let workspace = NSWorkspace.shared.notificationCenter
+        workspace.addObserver(forName: NSWorkspace.screensDidSleepNotification,
+                              object: nil, queue: .main) { [weak self] _ in
+            self?.policy.isScreenAsleep = true
+            self?.updateRenderMode()
+        }
+        workspace.addObserver(forName: NSWorkspace.screensDidWakeNotification,
+                              object: nil, queue: .main) { [weak self] _ in
+            self?.policy.isScreenAsleep = false
+            self?.monitor.forceRefresh()
+            self?.updateRenderMode()
+        }
+
+        // Locking the screen is not screen sleep, and both need catching.
+        let distributed = DistributedNotificationCenter.default()
+        distributed.addObserver(forName: .init("com.apple.screenIsLocked"),
+                                object: nil, queue: .main) { [weak self] _ in
+            self?.policy.isScreenLocked = true
+            self?.updateRenderMode()
+        }
+        distributed.addObserver(forName: .init("com.apple.screenIsUnlocked"),
+                                object: nil, queue: .main) { [weak self] _ in
+            self?.policy.isScreenLocked = false
+            self?.monitor.forceRefresh()
+            self?.updateRenderMode()
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name.NSProcessInfoPowerStateDidChange,
+            object: nil, queue: .main) { [weak self] _ in
+            self?.readPower()
+            self?.updateRenderMode()
+        }
+
+        // Unplugging raises no notification worth relying on, so it is
+        // checked on a slow timer. A minute late to drop six frames a second
+        // costs nothing.
+        powerTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            let before = self.policy
+            self.readPower()
+            if self.policy != before { self.updateRenderMode() }
+        }
+        readPower()
+    }
+
+    private func readPower() {
+        policy.isOnBattery = PowerSource.isOnBattery
+        policy.isLowPower = PowerSource.isLowPower
+    }
+
+    /// Recompute what the wallpaper should be doing and tell the windows.
+    private func updateRenderMode() {
+        let mode = policy.mode
+        windows.forEach { $0.apply(mode) }
+
+        // Asking Spotify what is playing costs an Apple Event every time.
+        // When nothing can see the answer, ask far less often.
+        let interval = mode == .off ? 10.0 : Preferences.Fixed.pollInterval
+        if monitor.interval != interval { monitor.start(interval: interval) }
+
+        lyricsTimer?.fireDate = mode.isLive ? Date() : .distantFuture
+        progressTimer?.fireDate = mode.isLive ? Date() : .distantFuture
+    }
+
+    /// Hold the live renderer open for a moment after the music stops.
+    ///
+    /// The platter free-wheels for several seconds and the arm swings back to
+    /// its rest. Freezing the instant playback ends would cut both of those
+    /// off halfway.
+    private func setAnimating(_ animating: Bool) {
+        settleTimer?.invalidate()
+        settleTimer = nil
+
+        if animating {
+            policy.isAnimating = true
+            updateRenderMode()
+            return
+        }
+
+        guard policy.isAnimating else { return }
+        settleTimer = Timer.scheduledTimer(withTimeInterval: 6, repeats: false) { [weak self] _ in
+            self?.policy.isAnimating = false
+            self?.updateRenderMode()
+        }
+    }
+
     /// Put the right room on screen, which depends on the hour when the
     /// clock is driving.
     private func refreshScene() {
         turntable.apply(preferences.activePreset)
         refreshLockScreen()
+        // The held frame is a picture of the old room.
+        windows.forEach { $0.redrawHeldFrame() }
     }
 
     private func refreshLockScreen() {
@@ -117,6 +216,10 @@ final class WallpaperController {
         clockTimer = nil
         lyricsTimer?.invalidate()
         lyricsTimer = nil
+        settleTimer?.invalidate()
+        settleTimer = nil
+        powerTimer?.invalidate()
+        powerTimer = nil
         windows.forEach { $0.orderOut(nil) }
         windows.removeAll()
     }
@@ -136,10 +239,15 @@ final class WallpaperController {
                                          pointOfView: turntable.pointOfView,
                                          frameRateLimit: Preferences.Fixed.frameRate)
             window.update(for: screen)
+            window.onVisibilityChange = { [weak self] visible in
+                self?.policy.isVisible = visible
+                self?.updateRenderMode()
+            }
             window.orderFrontRegardless()
             return window
         }
         Log.info("wallpaper showing on \(windows.count) display(s)")
+        windows.forEach { $0.apply(policy.mode) }
         applyTrackInfo(monitor.current)
         applyLyrics()
         refreshLockScreen()
@@ -215,7 +323,9 @@ final class WallpaperController {
 
     private func apply(_ playing: NowPlaying?) {
         if let playing {
-            turntable.setSpinning(playing.isPlaying || preferences.spinWhenPaused)
+            let moving = playing.isPlaying || preferences.spinWhenPaused
+            setAnimating(moving)
+            turntable.setSpinning(moving)
             if playing.isPlaying {
                 turntable.setProgress(playing.interpolatedProgress())
             } else {
@@ -225,6 +335,7 @@ final class WallpaperController {
             }
         } else {
             // Nothing playing: show the generated sleeve and park the arm.
+            setAnimating(preferences.spinWhenPaused)
             let generated = GenerativeCover.make(seed: Preferences.Fixed.sleeveSeed).image
             nowPlaying.update(artwork: generated)
             turntable.setArtwork(generated)

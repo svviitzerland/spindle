@@ -15,10 +15,23 @@ final class WallpaperWindow: NSWindow {
     private let lyricsView = LyricsView()
     private var lyricsConstraints: [NSLayoutConstraint] = []
     private var lyricsPlacement = TextPlacement(x: 0.055, y: 0.115, alignment: .leading)
+    /// Holds the last rendered frame while the scene is paused, so a still
+    /// wallpaper costs exactly what a desktop picture costs.
+    private let heldFrame = NSImageView()
+    /// Kept so the scene can be detached from the view while suspended and
+    /// put back when it is needed again.
+    private let heldScene: SCNScene
+    private let heldPointOfView: SCNNode
+    private var mode: RenderMode = .live(fps: 30)
+    /// Raised when macOS covers or reveals the window.
+    var onVisibilityChange: ((Bool) -> Void)?
+
     private var bottomInset: NSLayoutConstraint?
     private var leadingInset: NSLayoutConstraint?
 
     init(screen: NSScreen, scene: SCNScene, pointOfView: SCNNode, frameRateLimit: Int) {
+        heldScene = scene
+        heldPointOfView = pointOfView
         super.init(contentRect: screen.frame,
                    styleMask: .borderless,
                    backing: .buffered,
@@ -46,9 +59,15 @@ final class WallpaperWindow: NSWindow {
         sceneView.isPlaying = true
         sceneView.allowsCameraControl = false
 
+        heldFrame.frame = sceneView.frame
+        heldFrame.autoresizingMask = [.width, .height]
+        heldFrame.imageScaling = .scaleAxesIndependently
+        heldFrame.isHidden = true
+
         let container = NSView(frame: sceneView.frame)
         container.autoresizingMask = [.width, .height]
         container.addSubview(sceneView)
+        container.addSubview(heldFrame)
         container.addSubview(trackInfo)
         container.addSubview(lyricsView)
         lyricsView.translatesAutoresizingMaskIntoConstraints = false
@@ -81,9 +100,79 @@ final class WallpaperWindow: NSWindow {
     }
 
     @objc private func occlusionChanged() {
-        let visible = occlusionState.contains(.visible)
-        sceneView.rendersContinuously = visible
-        sceneView.isPlaying = visible
+        onVisibilityChange?(occlusionState.contains(.visible))
+    }
+
+    /// Put the renderer to sleep properly.
+    ///
+    /// `isPlaying = false` only stops the scene's animation clock. The view
+    /// keeps its display link running and goes on drawing the same frame
+    /// sixty times a second, which a profile shows plainly: the SceneKit
+    /// render queue stays busy and the Metal command queues with it. Hiding
+    /// the view and detaching the scene is what actually stops the work.
+    private func suspendRenderer() {
+        guard sceneView.scene != nil else { return }
+        sceneView.isPlaying = false
+        sceneView.rendersContinuously = false
+        sceneView.isHidden = true
+        sceneView.scene = nil
+    }
+
+    private func resumeRenderer(fps: Int) {
+        if sceneView.scene == nil {
+            sceneView.scene = heldScene
+            sceneView.pointOfView = heldPointOfView
+        }
+        sceneView.isHidden = false
+        sceneView.preferredFramesPerSecond = fps
+        sceneView.rendersContinuously = true
+        sceneView.isPlaying = true
+    }
+
+    /// Take a fresh picture of the scene while paused.
+    ///
+    /// Needed whenever the room changes underneath a held frame: switching
+    /// scene or pressing rebuilds the deck, and the picture on screen is of
+    /// the old one.
+    func redrawHeldFrame() {
+        guard !heldFrame.isHidden else { return }
+        let suspended = sceneView.scene == nil
+        if suspended { resumeRenderer(fps: 30) }
+        heldFrame.image = sceneView.snapshot()
+        if suspended { suspendRenderer() }
+    }
+
+    /// Switch between drawing the scene and holding a picture of it.
+    ///
+    /// Going still takes one snapshot and then stops the renderer entirely.
+    /// That single frame is the whole saving: an `NSImageView` showing a
+    /// bitmap asks nothing of the GPU between now and whenever the music
+    /// starts again.
+    func apply(_ newMode: RenderMode) {
+        guard newMode != mode else { return }
+        let wasLive = mode.isLive
+        mode = newMode
+
+        switch newMode {
+        case .live(let fps):
+            resumeRenderer(fps: fps)
+            heldFrame.isHidden = true
+            heldFrame.image = nil
+
+        case .still:
+            // Only worth snapshotting if something has been moving since the
+            // last one; otherwise the frame already on screen is current.
+            if wasLive || heldFrame.image == nil {
+                heldFrame.image = sceneView.snapshot()
+            }
+            heldFrame.isHidden = false
+            suspendRenderer()
+
+        case .off:
+            // Nothing is visible, so do not spend a frame producing a
+            // picture nobody will see. Keep whatever is already held.
+            suspendRenderer()
+        }
     }
 
     override var canBecomeKey: Bool { false }

@@ -33,6 +33,9 @@ final class NowPlayingMonitor {
     private var deniedSources: Set<NowPlaying.Source> = []
 
     private(set) var current: NowPlaying?
+    /// How often the apps are being asked, so a caller can avoid restarting
+    /// the timer with the interval it already has.
+    private(set) var interval: TimeInterval = 0
 
     init() {
         providers = [AppleMusicProvider(bridge: bridge), SpotifyProvider(bridge: bridge)]
@@ -40,6 +43,7 @@ final class NowPlayingMonitor {
 
     func start(interval: TimeInterval = 2.0) {
         stop()
+        self.interval = interval
         let timer = DispatchSource.makeTimerSource(queue: work)
         timer.schedule(deadline: .now(), repeating: interval, leeway: .milliseconds(250))
         timer.setEventHandler { [weak self] in self?.poll() }
@@ -50,6 +54,7 @@ final class NowPlayingMonitor {
     func stop() {
         timer?.cancel()
         timer = nil
+        interval = 0
     }
 
     func forceRefresh() {
