@@ -169,8 +169,13 @@ final class WallpaperWindow: NSWindow {
             suspendRenderer()
 
         case .off:
-            // Nothing is visible, so do not spend a frame producing a
-            // picture nobody will see. Keep whatever is already held.
+            // Nothing can see it now, but something will when the window is
+            // uncovered again, and suspending the renderer hides the scene
+            // view. Without a frame to leave behind, that is a blank desktop.
+            if wasLive || heldFrame.image == nil {
+                heldFrame.image = sceneView.snapshot()
+            }
+            heldFrame.isHidden = false
             suspendRenderer()
         }
     }
