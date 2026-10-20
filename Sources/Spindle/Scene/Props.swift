@@ -175,6 +175,25 @@ struct Props {
         return RecordStack(node: stack, topCover: topCover)
     }
 
+    /// A leaf never hangs perfectly still.
+    ///
+    /// Each one gets its own period and phase: foliage moving in unison reads
+    /// as a flag, not a plant. The amplitude is a couple of degrees, which is
+    /// the difference between a room with air in it and a diorama.
+    private func sway(_ leaf: SCNNode, phase: CGFloat, period: TimeInterval,
+                      amplitude: CGFloat) {
+        let restZ = leaf.eulerAngles.z
+        let restX = leaf.eulerAngles.x
+        let offset = Double(phase) * 2 * .pi
+        let drift = SCNAction.customAction(duration: period) { node, elapsed in
+            let t = Double(elapsed) / period * 2 * .pi + offset
+            node.eulerAngles.z = restZ + amplitude * CGFloat(sin(t))
+            // A touch of the other axis, so it rolls rather than wipes.
+            node.eulerAngles.x = restX + amplitude * 0.45 * CGFloat(sin(t * 0.73 + 1.1))
+        }
+        leaf.runAction(.repeatForever(drift))
+    }
+
     // MARK: Mug
 
     /// Glazed ceramic, with coffee in it. The handle is a torus clipped by
@@ -303,6 +322,9 @@ struct Props {
                 angle,
                 rng.unit() * 0.7 - 0.35)
             leafNode.castsShadow = true
+            sway(leafNode, phase: rng.unit(),
+                 period: 3.4 + Double(rng.unit()) * 2.6,
+                 amplitude: 0.022 + rng.unit() * 0.026)
             plant.addChildNode(leafNode)
         }
         return plant
@@ -377,6 +399,9 @@ struct Props {
                 angle,
                 rng.unit() * 0.66 - 0.33)
             leafNode.castsShadow = true
+            sway(leafNode, phase: rng.unit(),
+                 period: 3.4 + Double(rng.unit()) * 2.6,
+                 amplitude: 0.022 + rng.unit() * 0.026)
             plant.addChildNode(leafNode)
         }
         return plant
