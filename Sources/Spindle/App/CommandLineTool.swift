@@ -14,6 +14,7 @@ enum CommandLineTool {
       spindle render [options]     Write one frame as a PNG
       spindle icon --out <path>    Generate the app icon
       spindle scenes               List scene ids
+      spindle contact [--out p]    Render every scene onto one sheet
       spindle --help
 
     RENDER OPTIONS
@@ -41,6 +42,8 @@ enum CommandLineTool {
                 print("\(preset.id)\t\(preset.name) — \(preset.tagline)")
             }
             return 0
+        case "contact":
+            return contactCommand(Array(args.dropFirst()))
         case "render":
             return renderCommand(Array(args.dropFirst()))
         case "icon":
@@ -84,6 +87,24 @@ enum CommandLineTool {
             return 0
         } catch {
             Log.cli("render failed: \(error)")
+            return 1
+        }
+    }
+
+    /// Every scene side by side, which is the only way to judge whether a set
+    /// of palettes belongs together.
+    private static func contactCommand(_ args: [String]) -> Int32 {
+        let options = parse(args)
+        let outPath = options["out"] ?? "spindle-contact.png"
+        let url = URL(fileURLWithPath: (outPath as NSString).expandingTildeInPath)
+        let width = Int(options["width"] ?? "") ?? 560
+        do {
+            let sheet = try StillRenderer.contactSheet(tileWidth: width)
+            try StillRenderer.writePNG(sheet, to: url)
+            print("\(ScenePreset.all.count) scenes  →  \(url.path)")
+            return 0
+        } catch {
+            Log.cli("contact sheet failed: \(error)")
             return 1
         }
     }
