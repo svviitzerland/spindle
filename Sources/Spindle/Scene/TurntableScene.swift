@@ -291,9 +291,10 @@ final class TurntableScene {
         camera.grainIntensity = 0.26
         camera.grainScale = 1.2
         camera.grainIsColored = false
-        // A record turning at 33 rpm smears at the rim. Only the live view
-        // sees this: a still has no previous frame to blur against.
-        camera.motionBlurIntensity = 1.1
+        // A trace of smear at the rim, no more. A record turns far enough
+        // between frames that a strong setting blurs the label into a streak
+        // rather than making the motion read as smooth.
+        camera.motionBlurIntensity = 0.35
 
         // Contact shadows, without which nothing sits on the desk.
         camera.screenSpaceAmbientOcclusionIntensity = 1.9

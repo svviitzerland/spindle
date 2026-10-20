@@ -143,9 +143,11 @@ final class WallpaperController {
         // costs nothing.
         powerTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             guard let self else { return }
-            let before = self.policy
             self.readPower()
-            if self.policy != before { self.updateRenderMode() }
+            // Unconditionally, so a renderer that has somehow been left in
+            // the wrong state rights itself within the minute instead of
+            // staying frozen until something else happens to change.
+            self.updateRenderMode()
         }
         readPower()
     }
@@ -157,6 +159,14 @@ final class WallpaperController {
 
     /// Recompute what the wallpaper should be doing and tell the windows.
     private func updateRenderMode() {
+        // Read whether anything can see the window rather than trusting a
+        // flag kept up to date by notifications. Mirroring events into state
+        // means one missed or out-of-order notification leaves the renderer
+        // switched off with the music playing, and nothing ever corrects it.
+        policy.isVisible = windows.isEmpty
+            || windows.contains { $0.occlusionState.contains(.visible) }
+        policy.displayRefresh = NSScreen.main?.maximumFramesPerSecond ?? 60
+
         let mode = policy.mode
         windows.forEach { $0.apply(mode) }
 
@@ -239,10 +249,9 @@ final class WallpaperController {
                                          pointOfView: turntable.pointOfView,
                                          frameRateLimit: Preferences.Fixed.frameRate)
             window.update(for: screen)
-            window.onVisibilityChange = { [weak self] visible in
-                self?.policy.isVisible = visible
-                self?.updateRenderMode()
-            }
+            // The notification is only a prompt to look again; the answer
+            // comes from the window itself.
+            window.onVisibilityChange = { [weak self] _ in self?.updateRenderMode() }
             window.orderFrontRegardless()
             return window
         }
