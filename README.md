@@ -16,7 +16,7 @@ The platter spins while the track plays, and stops when you pause.
 ## Features
 
 * Your album art, on a spinning record, behind your desktop icons
-* Four scenes to pick from
+* Eight scenes to pick from
 * Coloured pressings, and you can add your own
 * Can match your lock screen too
 * Lives in the menu bar and stays out of the way
@@ -24,15 +24,18 @@ The platter spins while the track plays, and stops when you pause.
 
 ## Scenes
 
-| Daylight | Gallery |
-| :-: | :-: |
-| <img src="docs/daylight.jpg" alt=""> | <img src="docs/gallery.jpg" alt=""> |
-| Morning light through a window | A white room, blinds half open |
+<img src="docs/scenes.jpg" alt="The eight scenes">
 
-| Lamplight | Overhead |
-| :-: | :-: |
-| <img src="docs/lamplight.jpg" alt=""> | <img src="docs/overhead.jpg" alt=""> |
-| One lamp, late at night | Straight down on the deck |
+| | |
+| --- | --- |
+| **Daylight** | Morning, and the window is doing most of the work |
+| **Gallery** | A white room, a wooden desk, the blinds half open |
+| **Sage** | Green walls, pale oak, and a quiet afternoon |
+| **Clay** | Terracotta plaster, low sun, one plant for balance |
+| **Conservatory** | White walls, light oak, and more plants than sense |
+| **Dusk** | Blue outside, warm inside, the last side of the night |
+| **Lamplight** | One lamp, side two, nobody else awake |
+| **Overhead** | Straight down on the deck, nothing else in the frame |
 
 ## Install
 
