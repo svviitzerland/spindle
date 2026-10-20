@@ -355,7 +355,7 @@ enum Textures {
     /// Equirectangular map for `scene.lightingEnvironment`. Gives the chrome
     /// and lacquer something to reflect; without it PBR surfaces look dead.
     static func environment(preset: ScenePreset, size: Int = 512) -> CGImage {
-        let tint = preset.environmentTint
+        let tint = preset.environment
         let floorTone = preset.deskBase
         let keyU = 0.5 - atan2(Double(preset.key.position.x), Double(preset.key.position.z)) / (2 * .pi)
         return image(width: size * 2, height: size) { u, v in

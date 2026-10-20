@@ -232,7 +232,7 @@ final class TurntableScene {
     // MARK: Light
 
     private func addLights() {
-        for spec in [preset.key, preset.fill, preset.bounce] {
+        for spec in [preset.key, preset.fillLight, preset.bounceLight] {
             world.addChildNode(makeLight(spec))
         }
 
@@ -384,6 +384,12 @@ final class TurntableScene {
         if dressing.plant {
             let plant = props.plant()
             plant.position = SCNVector3(-0.600, 0, -0.195)
+            world.addChildNode(plant)
+        }
+        if dressing.bigPlant {
+            let plant = props.bigPlant()
+            plant.position = SCNVector3(0.605, 0, -0.230)
+            plant.eulerAngles = SCNVector3(0, 0.6, 0)
             world.addChildNode(plant)
         }
         if dressing.books {

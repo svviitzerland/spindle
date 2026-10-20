@@ -255,14 +255,16 @@ struct Props {
         var rng = GenerativeCover.SplitMix(seed: 90210)
 
         // Several greens rather than one: a single leaf colour is what makes
-        // CG foliage read as plastic.
+        // CG foliage read as plastic. They are shifted around the palette's
+        // own green so the planting belongs to the room.
+        let base = preset.foliage
         let greens = [
-            Materials.leaf(RGB(0.205, 0.390, 0.185), seed: 920),
-            Materials.leaf(RGB(0.265, 0.455, 0.225), seed: 921),
-            Materials.leaf(RGB(0.150, 0.300, 0.150), seed: 922),
-            Materials.leaf(RGB(0.310, 0.480, 0.250), seed: 923),
+            Materials.leaf(base, seed: 920),
+            Materials.leaf(base.scaled(1.28), seed: 921),
+            Materials.leaf(base.scaled(0.74), seed: 922),
+            Materials.leaf(base.mixed(with: RGB(0.62, 0.70, 0.34), 0.35), seed: 923),
         ]
-        let stemMaterial = Materials.leaf(RGB(0.22, 0.31, 0.16), seed: 911)
+        let stemMaterial = Materials.leaf(base.scaled(0.82), seed: 911)
 
         for i in 0..<22 {
             // Spread by the golden angle, which is how a real plant fills a pot.
@@ -300,6 +302,80 @@ struct Props {
                 -0.35 + rng.unit() * 0.5 - lean * 0.30,
                 angle,
                 rng.unit() * 0.7 - 0.35)
+            leafNode.castsShadow = true
+            plant.addChildNode(leafNode)
+        }
+        return plant
+    }
+
+    /// A larger plant, for rooms where the green is the point rather than an
+    /// accent. Taller pot, longer stems, and leaves that break the line of
+    /// the wall behind the desk.
+    func bigPlant() -> SCNNode {
+        let plant = SCNNode()
+        let base = preset.foliage
+
+        let pot = SCNCone(topRadius: 0.098, bottomRadius: 0.076, height: 0.165)
+        pot.radialSegmentCount = 40
+        pot.firstMaterial = Materials.ceramic(RGB(0.545, 0.360, 0.272))
+        let potNode = SCNNode(geometry: pot)
+        potNode.position = SCNVector3(0, 0.0825, 0)
+        potNode.castsShadow = true
+        plant.addChildNode(potNode)
+
+        let rim = SCNTorus(ringRadius: 0.098, pipeRadius: 0.0068)
+        rim.firstMaterial = Materials.ceramic(RGB(0.585, 0.392, 0.296))
+        let rimNode = SCNNode(geometry: rim)
+        rimNode.position = SCNVector3(0, 0.164, 0)
+        plant.addChildNode(rimNode)
+
+        let soil = SCNCylinder(radius: 0.093, height: 0.007)
+        soil.firstMaterial = Materials.rubber(RGB(0.082, 0.058, 0.040), seed: 311)
+        let soilNode = SCNNode(geometry: soil)
+        soilNode.position = SCNVector3(0, 0.159, 0)
+        plant.addChildNode(soilNode)
+
+        let greens = [
+            Materials.leaf(base, seed: 930),
+            Materials.leaf(base.scaled(1.22), seed: 931),
+            Materials.leaf(base.scaled(0.70), seed: 932),
+        ]
+        let stemMaterial = Materials.leaf(base.scaled(0.78), seed: 933)
+
+        var rng = GenerativeCover.SplitMix(seed: 71077)
+        for i in 0..<26 {
+            let angle = CGFloat(i) * 2.3998 + rng.unit() * 0.20
+            let maturity = rng.unit()
+            let lean = 0.22 + maturity * 0.86
+            let length = 0.135 + rng.unit() * 0.120
+            let height = 0.115 + (1 - maturity) * 0.235
+
+            let stem = SCNCylinder(radius: 0.0024, height: height)
+            stem.radialSegmentCount = 8
+            stem.firstMaterial = stemMaterial
+            let stemNode = SCNNode(geometry: stem)
+            stemNode.position = SCNVector3(
+                sin(angle) * lean * height * 0.30,
+                0.158 + height / 2,
+                cos(angle) * lean * height * 0.30)
+            stemNode.eulerAngles = SCNVector3(lean * 0.50 * cos(angle), 0,
+                                              -lean * 0.50 * sin(angle))
+            plant.addChildNode(stemNode)
+
+            let reach = 0.030 + lean * height * 0.74
+            let leaf = SCNSphere(radius: length / 2)
+            leaf.segmentCount = 20
+            leaf.firstMaterial = greens[i % greens.count]
+            let leafNode = SCNNode(geometry: leaf)
+            leafNode.scale = SCNVector3(0.44 + rng.unit() * 0.18, 0.080, 1.0)
+            leafNode.position = SCNVector3(
+                sin(angle) * reach,
+                0.158 + height * (0.90 - lean * 0.20),
+                cos(angle) * reach)
+            leafNode.eulerAngles = SCNVector3(
+                -0.32 + rng.unit() * 0.48 - lean * 0.28,
+                angle,
+                rng.unit() * 0.66 - 0.33)
             leafNode.castsShadow = true
             plant.addChildNode(leafNode)
         }

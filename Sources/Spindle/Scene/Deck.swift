@@ -604,7 +604,7 @@ final class Deck {
         // Power indicator. Small, warm, and the only thing in the scene that
         // emits its own light.
         let led = SCNSphere(radius: 0.0026)
-        led.firstMaterial = Materials.emissive(RGB(1.0, 0.52, 0.20), intensity: 1.4)
+        led.firstMaterial = Materials.emissive(preset.accent, intensity: 1.4)
         let ledNode = SCNNode(geometry: led)
         ledNode.position = SCNVector3(0.062, base + 0.0022, 0.1465)
         node.addChildNode(ledNode)
