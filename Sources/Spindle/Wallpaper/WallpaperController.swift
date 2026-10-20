@@ -14,6 +14,7 @@ final class WallpaperController {
     /// What is on the platter now, so it can be moved to the pile when the
     /// next track starts.
     private var currentArtwork: NSImage?
+    private var currentLyrics: Lyrics?
     private var turntable: TurntableScene
     private var windows: [WallpaperWindow] = []
     private var cancellables: Set<AnyCancellable> = []
@@ -51,6 +52,10 @@ final class WallpaperController {
             self.currentArtwork = image
             self.nowPlaying.update(artwork: image)
             self.turntable.setArtwork(image)
+        }
+        monitor.onLyrics = { [weak self] lyrics in
+            self?.currentLyrics = lyrics
+            self?.applyLyrics()
         }
         monitor.onPermissionDenied = { [weak self] source in
             self?.nowPlaying.denied(source)
@@ -125,6 +130,7 @@ final class WallpaperController {
         }
         Log.info("wallpaper showing on \(windows.count) display(s)")
         applyTrackInfo(monitor.current)
+        applyLyrics()
         refreshLockScreen()
     }
 
@@ -178,6 +184,11 @@ final class WallpaperController {
             .dropFirst()
             .sink { [weak self] _ in self?.applyTrackInfo(self?.monitor.current) }
             .store(in: &cancellables)
+
+        preferences.$showLyrics
+            .dropFirst()
+            .sink { [weak self] _ in self?.applyLyrics() }
+            .store(in: &cancellables)
     }
 
     // MARK: Reacting to playback
@@ -207,8 +218,20 @@ final class WallpaperController {
         windows.forEach { $0.setTrackInfo(playing, visible: preferences.showTrackInfo) }
     }
 
+    /// The line is estimated from elapsed time, so this is refreshed on the
+    /// same beat as the tonearm rather than only when the track changes.
+    private func applyLyrics() {
+        let progress = monitor.current?.interpolatedProgress() ?? 0
+        let visible = preferences.showLyrics && monitor.current?.isPlaying == true
+        windows.forEach {
+            $0.setLyricsPlacement(preferences.activePreset.lyrics, screen: $0.screen)
+            $0.setLyrics(currentLyrics, progress: progress, visible: visible)
+        }
+    }
+
     private func advanceTonearm() {
         guard let playing = monitor.current, playing.isPlaying else { return }
         turntable.setProgress(playing.interpolatedProgress())
+        applyLyrics()
     }
 }

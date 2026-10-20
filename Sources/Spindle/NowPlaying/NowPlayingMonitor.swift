@@ -12,6 +12,9 @@ final class NowPlayingMonitor {
 
     /// Called on the main queue whenever the picture changes.
     var onChange: ((NowPlaying?) -> Void)?
+    /// Called on the main queue when lyrics arrive, or nil when the track has
+    /// none and when the source cannot supply them at all.
+    var onLyrics: ((Lyrics?) -> Void)?
     /// Called on the main queue when new cover art is available.
     var onArtwork: ((NSImage?) -> Void)?
     /// Called once if macOS refuses the Apple Events permission.
@@ -58,10 +61,12 @@ final class NowPlayingMonitor {
         if changed {
             lastTrackKey = playing?.trackKey
             let artwork = playing.flatMap { readArtwork(for: $0.source) }
+            let lyrics = playing.flatMap { readLyrics(for: $0) }
             DispatchQueue.main.async { [weak self] in
                 self?.current = playing
                 self?.onChange?(playing)
                 self?.onArtwork?(artwork)
+                self?.onLyrics?(lyrics)
             }
         } else {
             DispatchQueue.main.async { [weak self] in
@@ -98,6 +103,20 @@ final class NowPlayingMonitor {
             return try provider.artwork()
         } catch {
             note(error, from: source)
+            return nil
+        }
+    }
+
+    /// Whatever the source keeps against this track. Only Music has any.
+    private func readLyrics(for playing: NowPlaying) -> Lyrics? {
+        guard let provider = providers.first(where: { $0.source == playing.source }) else {
+            return nil
+        }
+        do {
+            guard let text = try provider.lyrics() else { return nil }
+            return Lyrics(text: text, trackKey: playing.trackKey)
+        } catch {
+            note(error, from: playing.source)
             return nil
         }
     }

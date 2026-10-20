@@ -26,7 +26,7 @@ final class PreferencesWindowController: NSWindowController {
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = NSColor(srgbRed: 0.055, green: 0.052, blue: 0.050, alpha: 1)
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: Theme.windowWidth, height: 694))
+        window.setContentSize(NSSize(width: Theme.windowWidth, height: 718))
         window.center()
         self.init(window: window)
     }
@@ -321,6 +321,9 @@ private struct Controls: View {
                        help: "Changes the room through the day and moves the sun with it.",
                        isOn: $preferences.followsClock)
                 Switch(title: "Show track on desktop", isOn: $preferences.showTrackInfo)
+                Switch(title: "Show lyrics",
+                       help: "From your Music library. Spotify does not provide any.",
+                       isOn: $preferences.showLyrics)
                 Switch(title: "Keep turning when paused", isOn: $preferences.spinWhenPaused)
                 Switch(title: "Use on the lock screen",
                        help: "Sets your desktop picture to a still of this scene.",

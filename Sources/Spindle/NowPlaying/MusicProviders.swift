@@ -9,6 +9,13 @@ protocol MusicProvider {
     func fetch() throws -> NowPlaying?
     /// Cover art for the current track, if the app will give it up.
     func artwork() throws -> NSImage?
+    /// Lyrics stored against the current track, if the app keeps any.
+    func lyrics() throws -> String?
+}
+
+extension MusicProvider {
+    /// Most sources have nothing to offer here.
+    func lyrics() throws -> String? { nil }
 }
 
 // MARK: - Spotify
@@ -56,6 +63,11 @@ struct SpotifyProvider: MusicProvider {
                           source: source)
     }
 
+    /// Spotify's scripting interface has no lyrics in it at all, so there is
+    /// nothing to ask for. Saying so here is better than an empty result that
+    /// looks like a track without lyrics.
+    func lyrics() throws -> String? { nil }
+
     func artwork() throws -> NSImage? {
         guard isRunning else { return nil }
         let result = try bridge.run(Self.artworkScript, cacheKey: "spotify.artwork")
@@ -88,6 +100,13 @@ struct AppleMusicProvider: MusicProvider {
     end tell
     """
 
+    private static let lyricsScript = """
+    tell application id "com.apple.Music"
+        if player state is stopped then return ""
+        return lyrics of current track
+    end tell
+    """
+
     private static let artworkScript = """
     tell application id "com.apple.Music"
         if player state is stopped then return missing value
@@ -111,6 +130,15 @@ struct AppleMusicProvider: MusicProvider {
                           position: Double(fields[4]) ?? 0,
                           isPlaying: fields[5].lowercased().contains("playing"),
                           source: source)
+    }
+
+    /// Whatever is stored against the track in your own library. Music keeps
+    /// this as plain text with no timings.
+    func lyrics() throws -> String? {
+        guard isRunning else { return nil }
+        let result = try bridge.run(Self.lyricsScript, cacheKey: "music.lyrics")
+        guard let text = result.stringValue, !text.isEmpty else { return nil }
+        return text
     }
 
     func artwork() throws -> NSImage? {
