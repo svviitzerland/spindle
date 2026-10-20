@@ -31,6 +31,8 @@ struct RenderPolicy: Equatable {
     var isOnBattery = false
     /// Keep the dust and the leaves moving even with nothing playing.
     var alwaysAnimate = false
+    /// What the display can actually show, so the frame rate can divide it.
+    var displayRefresh = 60
 
     var mode: RenderMode {
         // Nothing can see it, so draw nothing at all.
@@ -39,11 +41,28 @@ struct RenderPolicy: Equatable {
         // Nothing is moving, so one frame says everything the next one would.
         guard isAnimating || alwaysAnimate else { return .still }
 
-        // A record turns at 33 rpm. It does not need sixty frames a second,
-        // and on battery it does not need thirty.
-        if isLowPower { return .live(fps: 15) }
-        if isOnBattery { return .live(fps: 24) }
-        return .live(fps: 30)
+        // Only Low Power Mode gets a reduced rate, because that is the one
+        // place the machine has been told to save power. The saving that
+        // matters is not drawing at all when nothing moves, which is already
+        // handled above; shaving frames off the one moment somebody is
+        // actually watching buys little and is immediately visible.
+        if isLowPower { return .live(fps: Self.evenDivisor(of: displayRefresh, upTo: 30)) }
+        return .live(fps: Self.evenDivisor(of: displayRefresh, upTo: 60))
+    }
+
+    /// The fastest rate at or below `limit` that divides the refresh exactly.
+    ///
+    /// Frames landing on an uneven cadence judder: 24 on a 60 Hz display is
+    /// two and a half refreshes per frame, and a turning record with fine
+    /// grooves shows it plainly. Dividing exactly is always safe, on 60 Hz
+    /// panels and on 120 Hz ones.
+    static func evenDivisor(of refresh: Int, upTo limit: Int) -> Int {
+        guard refresh > 0 else { return limit }
+        for step in 1...max(refresh, 1) where refresh % step == 0 {
+            let rate = refresh / step
+            if rate <= limit { return rate }
+        }
+        return min(refresh, limit)
     }
 }
 
