@@ -32,6 +32,9 @@ extension ScenePreset {
         key: .daylight(from: Vec3(-0.95, 1.05, 0.62), intensity: 46, softness: 9),
         exposure: -0.42,
         vignette: 0.40,
+        // The deck sits right of centre with the sleeve beside it; the wall
+        // above and left of both is the only space wide enough.
+        lyrics: TextPlacement(x: 0.055, y: 0.125, alignment: .leading),
         dressing: .init(sleeve: true, stack: true, mug: true, plant: true, books: true),
         dustCount: 90
     )
@@ -61,6 +64,9 @@ extension ScenePreset {
         exposure: -0.62,
         vignette: 0.44,
         bloom: 0.07,
+        // Blinds cross the middle of the wall and the print hangs upper
+        // right, so the text keeps to the quiet corner on the left.
+        lyrics: TextPlacement(x: 0.05, y: 0.105, alignment: .leading),
         dressing: .init(sleeve: true, sleeveStand: true, framedArt: true),
         dustCount: 70
     )
@@ -87,6 +93,9 @@ extension ScenePreset {
                        intensity: 45, softness: 11),
         exposure: -0.46,
         vignette: 0.38,
+        // The camera is round to the left here, which pushes the deck right
+        // and leaves the upper wall open.
+        lyrics: TextPlacement(x: 0.058, y: 0.115, alignment: .leading),
         dressing: .init(sleeve: true, sleeveStand: true, mug: true, plant: true, books: true),
         dustCount: 85
     )
@@ -117,6 +126,9 @@ extension ScenePreset {
         exposure: -0.56,
         vignette: 0.46,
         bloom: 0.12,
+        // Sleeve and planting take the left of frame, so the text crosses to
+        // the bare clay on the right.
+        lyrics: TextPlacement(x: 0.945, y: 0.125, alignment: .trailing),
         dressing: .init(sleeve: true, sleeveStand: true, mug: true,
                         plant: true, bigPlant: true),
         dustCount: 110
@@ -146,6 +158,8 @@ extension ScenePreset {
         exposure: -0.55,
         vignette: 0.34,
         bloom: 0.08,
+        // Planting on both sides. The gap is the middle of the wall.
+        lyrics: TextPlacement(x: 0.5, y: 0.1, alignment: .center),
         dressing: .init(sleeve: true, sleeveStand: true, mug: true,
                         plant: true, bigPlant: true),
         dustCount: 60
@@ -192,6 +206,9 @@ extension ScenePreset {
         exposure: 0.10,
         vignette: 0.58,
         bloom: 0.20,
+        // The lamp owns the right of the desk but not the wall above it, and
+        // dark blue plaster is the best ground pale text ever gets.
+        lyrics: TextPlacement(x: 0.945, y: 0.14, alignment: .trailing),
         dressing: .init(sleeve: true, sleeveStand: true, lamp: true, plant: true),
         dustCount: 120
     )
@@ -222,6 +239,9 @@ extension ScenePreset {
         exposure: 0.15,
         vignette: 0.80,
         bloom: 0.26,
+        // Everything falls off into shadow on the left, which is exactly
+        // where pale text wants to be.
+        lyrics: TextPlacement(x: 0.055, y: 0.13, alignment: .leading),
         dressing: .init(sleeve: true, stack: true, lamp: true, headphones: true),
         dustCount: 150
     )
@@ -259,6 +279,9 @@ extension ScenePreset {
         environmentIntensity: 0.16,
         exposure: -0.20,
         vignette: 0.55,
+        // No wall at all from up here; the bare desk to the left of the deck
+        // is the only clear ground.
+        lyrics: TextPlacement(x: 0.045, y: 0.2, alignment: .leading),
         dressing: .init(wall: false, sleeve: false, mug: true),
         dustCount: 40
     )

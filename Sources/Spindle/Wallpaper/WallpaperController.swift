@@ -14,11 +14,13 @@ final class WallpaperController {
     /// What is on the platter now, so it can be moved to the pile when the
     /// next track starts.
     private var currentArtwork: NSImage?
+    private var currentLyrics: Lyrics?
     private var turntable: TurntableScene
     private var windows: [WallpaperWindow] = []
     private var cancellables: Set<AnyCancellable> = []
     private var progressTimer: Timer?
     private var clockTimer: Timer?
+    private var lyricsTimer: Timer?
 
     /// Raised when an app refuses automation, so the menu can offer a fix.
     var onPermissionDenied: ((NowPlaying.Source) -> Void)?
@@ -52,16 +54,28 @@ final class WallpaperController {
             self.nowPlaying.update(artwork: image)
             self.turntable.setArtwork(image)
         }
+        monitor.onLyrics = { [weak self] lyrics in
+            self?.currentLyrics = lyrics
+            self?.applyLyrics()
+        }
         monitor.onPermissionDenied = { [weak self] source in
             self?.nowPlaying.denied(source)
             self?.onPermissionDenied?(source)
         }
+        monitor.looksUpLyrics = preferences.lyricsLookup
         monitor.start(interval: Preferences.Fixed.pollInterval)
 
         // The tonearm creeps inward between polls rather than jumping every
         // two seconds when the next sample lands.
         progressTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in
             self?.advanceTonearm()
+        }
+
+        // Lyric lines turn over every two or three seconds, so they get their
+        // own beat. Sharing the tonearm's four-second tick skipped lines.
+        lyricsTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self, self.preferences.showLyrics else { return }
+            self.applyLyrics()
         }
 
         // The sun moves slowly. Five minutes is frequent enough that the room
@@ -101,6 +115,8 @@ final class WallpaperController {
         progressTimer = nil
         clockTimer?.invalidate()
         clockTimer = nil
+        lyricsTimer?.invalidate()
+        lyricsTimer = nil
         windows.forEach { $0.orderOut(nil) }
         windows.removeAll()
     }
@@ -125,6 +141,7 @@ final class WallpaperController {
         }
         Log.info("wallpaper showing on \(windows.count) display(s)")
         applyTrackInfo(monitor.current)
+        applyLyrics()
         refreshLockScreen()
     }
 
@@ -178,6 +195,20 @@ final class WallpaperController {
             .dropFirst()
             .sink { [weak self] _ in self?.applyTrackInfo(self?.monitor.current) }
             .store(in: &cancellables)
+
+        preferences.$showLyrics
+            .dropFirst()
+            .sink { [weak self] _ in self?.applyLyrics() }
+            .store(in: &cancellables)
+
+        preferences.$lyricsLookup
+            .dropFirst()
+            .sink { [weak self] enabled in
+                guard let self else { return }
+                self.monitor.looksUpLyrics = enabled
+                self.monitor.forceRefresh()
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: Reacting to playback
@@ -205,6 +236,21 @@ final class WallpaperController {
 
     private func applyTrackInfo(_ playing: NowPlaying?) {
         windows.forEach { $0.setTrackInfo(playing, visible: preferences.showTrackInfo) }
+    }
+
+    /// The line is estimated from elapsed time, so this is refreshed on the
+    /// same beat as the tonearm rather than only when the track changes.
+    private func applyLyrics() {
+        let playing = monitor.current
+        // Timed lyrics are followed against the clock, so they need seconds
+        // rather than a fraction of the track.
+        let elapsed = playing.map { $0.interpolatedProgress() * $0.duration } ?? 0
+        let visible = preferences.showLyrics && playing?.isPlaying == true
+        windows.forEach {
+            $0.setLyricsPlacement(preferences.activePreset.lyrics, screen: $0.screen)
+            $0.setLyrics(currentLyrics, elapsed: elapsed,
+                         duration: playing?.duration ?? 0, visible: visible)
+        }
     }
 
     private func advanceTonearm() {

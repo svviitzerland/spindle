@@ -28,6 +28,8 @@ final class Preferences: ObservableObject {
         static let lockScreen = "lockScreenBackground"
         static let pressing = "pressing"
         static let followsClock = "followsClock"
+        static let showLyrics = "showLyrics"
+        static let lyricsLookup = "lyricsLookup"
     }
 
     private let defaults: UserDefaults
@@ -41,6 +43,20 @@ final class Preferences: ObservableObject {
 
     @Published var showTrackInfo: Bool {
         didSet { defaults.set(showTrackInfo, forKey: Key.showTrackInfo) }
+    }
+
+    /// Show lyrics from your Music library. Named for what it is: Music
+    /// stores them untimed, so the line shown is estimated from elapsed time.
+    @Published var showLyrics: Bool {
+        didSet { defaults.set(showLyrics, forKey: Key.showLyrics) }
+    }
+
+    /// Look lyrics up by name when the music app has none.
+    ///
+    /// Off by default, and the only thing in Spindle that sends anything
+    /// anywhere: the title, artist, album and length go to a lyrics database.
+    @Published var lyricsLookup: Bool {
+        didSet { defaults.set(lyricsLookup, forKey: Key.lyricsLookup) }
     }
 
     /// Put a still of the scene on the lock screen, by way of the desktop
@@ -74,6 +90,8 @@ final class Preferences: ObservableObject {
         lockScreenBackground = defaults.object(forKey: Key.lockScreen) as? Bool ?? false
         pressingID = defaults.string(forKey: Key.pressing) ?? Pressing.black.id
         followsClock = defaults.object(forKey: Key.followsClock) as? Bool ?? false
+        showLyrics = defaults.object(forKey: Key.showLyrics) as? Bool ?? false
+        lyricsLookup = defaults.object(forKey: Key.lyricsLookup) as? Bool ?? false
     }
 
     // MARK: Launch at login

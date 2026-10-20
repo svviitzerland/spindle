@@ -12,12 +12,20 @@ final class NowPlayingMonitor {
 
     /// Called on the main queue whenever the picture changes.
     var onChange: ((NowPlaying?) -> Void)?
+    /// Called on the main queue when lyrics arrive, or nil when the track has
+    /// none and when the source cannot supply them at all.
+    var onLyrics: ((Lyrics?) -> Void)?
     /// Called on the main queue when new cover art is available.
     var onArtwork: ((NSImage?) -> Void)?
     /// Called once if macOS refuses the Apple Events permission.
     var onPermissionDenied: ((NowPlaying.Source) -> Void)?
 
+    /// Whether to look lyrics up by name when the app has none of its own.
+    /// Owned by preferences; the monitor is told rather than asking.
+    var looksUpLyrics = false
+
     private let bridge = AppleScriptBridge()
+    private let lyricsService = LyricsService()
     private let providers: [MusicProvider]
     private let work = DispatchQueue(label: "com.spindle.nowplaying", qos: .utility)
     private var timer: DispatchSourceTimer?
@@ -58,10 +66,12 @@ final class NowPlayingMonitor {
         if changed {
             lastTrackKey = playing?.trackKey
             let artwork = playing.flatMap { readArtwork(for: $0.source) }
+            let lyrics = playing.flatMap { readLyrics(for: $0) }
             DispatchQueue.main.async { [weak self] in
                 self?.current = playing
                 self?.onChange?(playing)
                 self?.onArtwork?(artwork)
+                self?.onLyrics?(lyrics)
             }
         } else {
             DispatchQueue.main.async { [weak self] in
@@ -100,6 +110,28 @@ final class NowPlayingMonitor {
             note(error, from: source)
             return nil
         }
+    }
+
+    /// Whatever the source keeps against this track. Only Music has any.
+    private func readLyrics(for playing: NowPlaying) -> Lyrics? {
+        guard let provider = providers.first(where: { $0.source == playing.source }) else {
+            return nil
+        }
+        // What the app itself holds, which costs nothing and leaves the
+        // machine untouched.
+        do {
+            if let text = try provider.lyrics(),
+               let local = Lyrics(text: text, trackKey: playing.trackKey) {
+                return local
+            }
+        } catch {
+            note(error, from: playing.source)
+        }
+
+        // Then, only if asked, look them up by name. This is where Spotify
+        // gets lyrics at all, and where anything gets timed ones.
+        guard looksUpLyrics else { return nil }
+        return lyricsService.lyrics(for: playing)
     }
 
     /// Log once per source, and stop pestering an app that said no.

@@ -12,6 +12,9 @@ final class WallpaperWindow: NSWindow {
 
     private let sceneView = SCNView()
     private let trackInfo = TrackInfoView()
+    private let lyricsView = LyricsView()
+    private var lyricsConstraints: [NSLayoutConstraint] = []
+    private var lyricsPlacement = TextPlacement(x: 0.055, y: 0.115, alignment: .leading)
     private var bottomInset: NSLayoutConstraint?
     private var leadingInset: NSLayoutConstraint?
 
@@ -47,6 +50,8 @@ final class WallpaperWindow: NSWindow {
         container.autoresizingMask = [.width, .height]
         container.addSubview(sceneView)
         container.addSubview(trackInfo)
+        container.addSubview(lyricsView)
+        lyricsView.translatesAutoresizingMaskIntoConstraints = false
         trackInfo.translatesAutoresizingMaskIntoConstraints = false
         // Inset by whatever the Dock and menu bar are occupying, so the caption
         // is never printed underneath the Dock.
@@ -59,8 +64,26 @@ final class WallpaperWindow: NSWindow {
             constant: (screen.visibleFrame.minX - screen.frame.minX) + gutter)
         NSLayoutConstraint.activate([leadingInset, bottomInset].compactMap { $0 })
         contentView = container
+        applyLyricsPlacement(in: screen)
 
         setFrame(screen.frame, display: true)
+
+        // Stop drawing a room nobody can see. The desktop spends most of its
+        // life completely covered by other windows, and rendering a 3-D scene
+        // behind them is the single largest thing Spindle costs.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(occlusionChanged),
+            name: NSWindow.didChangeOcclusionStateNotification, object: self)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func occlusionChanged() {
+        let visible = occlusionState.contains(.visible)
+        sceneView.rendersContinuously = visible
+        sceneView.isPlaying = visible
     }
 
     override var canBecomeKey: Bool { false }
@@ -72,15 +95,140 @@ final class WallpaperWindow: NSWindow {
         let gutter: CGFloat = 40
         bottomInset?.constant = -(screen.visibleFrame.minY - screen.frame.minY) - gutter
         leadingInset?.constant = (screen.visibleFrame.minX - screen.frame.minX) + gutter
+        applyLyricsPlacement(in: screen)
     }
 
     func setFrameRateLimit(_ fps: Int) {
         sceneView.preferredFramesPerSecond = fps
     }
 
+    /// Lyrics sit wherever the current room has a clear wall, so the anchor
+    /// moves with the scene rather than living in a fixed corner.
+    func setLyricsPlacement(_ placement: TextPlacement, screen: NSScreen?) {
+        guard placement != lyricsPlacement else { return }
+        lyricsPlacement = placement
+        applyLyricsPlacement(in: screen ?? self.screen ?? NSScreen.main!)
+    }
+
+    func setLyrics(_ lyrics: Lyrics?, elapsed: TimeInterval, duration: TimeInterval,
+                   visible: Bool) {
+        lyricsView.isHidden = !visible || lyrics == nil
+        guard let lyrics else { return }
+        lyricsView.apply(lyrics.window(elapsed: elapsed, duration: duration),
+                         alignment: lyricsPlacement.alignment)
+    }
+
+    private func applyLyricsPlacement(in screen: NSScreen) {
+        NSLayoutConstraint.deactivate(lyricsConstraints)
+        guard let container = contentView else { return }
+
+        let size = screen.frame.size
+        let top = size.height * lyricsPlacement.y
+        // Wide enough for a line of a song, narrow enough to stay off the deck.
+        let width = min(size.width * 0.40, 560)
+
+        var constraints: [NSLayoutConstraint] = [
+            lyricsView.topAnchor.constraint(equalTo: container.topAnchor, constant: top),
+            lyricsView.widthAnchor.constraint(equalToConstant: width),
+        ]
+
+        switch lyricsPlacement.alignment {
+        case .leading:
+            constraints.append(lyricsView.leadingAnchor.constraint(
+                equalTo: container.leadingAnchor, constant: size.width * lyricsPlacement.x))
+        case .trailing:
+            constraints.append(lyricsView.trailingAnchor.constraint(
+                equalTo: container.leadingAnchor, constant: size.width * lyricsPlacement.x))
+        case .center:
+            constraints.append(lyricsView.centerXAnchor.constraint(
+                equalTo: container.leadingAnchor, constant: size.width * lyricsPlacement.x))
+        }
+
+        NSLayoutConstraint.activate(constraints)
+        lyricsConstraints = constraints
+    }
+
     func setTrackInfo(_ playing: NowPlaying?, visible: Bool) {
         trackInfo.isHidden = !visible || playing == nil
         trackInfo.apply(playing)
+    }
+}
+
+/// Three lines of a song: the one being sung, with its neighbours faded.
+///
+/// Deliberately quiet. This is a wallpaper, and a wall of bright text over a
+/// lit room would be the only thing anybody ever saw.
+private final class LyricsView: NSView {
+    private let previous = NSTextField(labelWithString: "")
+    private let current = NSTextField(labelWithString: "")
+    private let next = NSTextField(labelWithString: "")
+    private let stack: NSStackView
+    private var lastSignature: [String] = []
+    private var lastAlignment: TextPlacement.Alignment?
+
+    init() {
+        stack = NSStackView(views: [previous, current, next])
+        super.init(frame: .zero)
+        wantsLayer = true
+
+        previous.font = .systemFont(ofSize: 15, weight: .regular)
+        previous.textColor = NSColor.white.withAlphaComponent(0.34)
+        next.font = .systemFont(ofSize: 15, weight: .regular)
+        next.textColor = NSColor.white.withAlphaComponent(0.34)
+        current.font = .systemFont(ofSize: 23, weight: .medium)
+        current.textColor = NSColor.white.withAlphaComponent(0.93)
+
+        for label in [previous, current, next] {
+            label.lineBreakMode = .byTruncatingTail
+            label.maximumNumberOfLines = 2
+            label.shadow = {
+                let shadow = NSShadow()
+                shadow.shadowColor = NSColor.black.withAlphaComponent(0.6)
+                shadow.shadowBlurRadius = 10
+                shadow.shadowOffset = NSSize(width: 0, height: -1)
+                return shadow
+            }()
+        }
+
+        stack.orientation = .vertical
+        stack.spacing = 7
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: topAnchor),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    func apply(_ window: (before: String?, current: String, after: String?),
+               alignment: TextPlacement.Alignment) {
+        // Called every second, but a line lasts several. Redrawing text that
+        // has not changed is work for nothing.
+        let signature = [window.before ?? "", window.current, window.after ?? ""]
+        guard signature != lastSignature || alignment != lastAlignment else { return }
+        lastSignature = signature
+        lastAlignment = alignment
+
+        previous.stringValue = window.before ?? ""
+        current.stringValue = window.current
+        next.stringValue = window.after ?? ""
+        previous.isHidden = window.before == nil
+        next.isHidden = window.after == nil
+
+        let nsAlignment: NSTextAlignment
+        switch alignment {
+        case .leading: nsAlignment = .left
+        case .center: nsAlignment = .center
+        case .trailing: nsAlignment = .right
+        }
+        for label in [previous, current, next] { label.alignment = nsAlignment }
+        stack.alignment = alignment == .trailing ? .trailing
+            : (alignment == .center ? .centerX : .leading)
     }
 }
 

@@ -54,6 +54,10 @@ struct ScenePreset: Identifiable, Hashable, Sendable {
 
     // MARK: Room
 
+    /// Where lyrics sit in this room. Defaults to the top left, which is
+    /// clear in most of them.
+    var lyrics: TextPlacement = TextPlacement(x: 0.055, y: 0.115, alignment: .leading)
+
     var dressing: Dressing = Dressing()
     var dustCount: Int = 80
     var dustTint: RGB?
@@ -179,6 +183,24 @@ extension ScenePreset.Light {
                  toward: Vec3(0, 0.26, -0.10),
                  color: wood.scaled(1.9),
                  intensity: 80)
+    }
+}
+
+// MARK: - Text placement
+
+/// Where a block of text sits on screen.
+///
+/// Every scene puts its furniture somewhere different, so one fixed corner
+/// would land on the deck in one room and in dead space in another. Each
+/// preset names its own clear wall.
+struct TextPlacement: Hashable, Sendable {
+    /// Fractions of the screen, with 0,0 at the top left.
+    var x: CGFloat
+    var y: CGFloat
+    var alignment: Alignment
+
+    enum Alignment: Hashable, Sendable {
+        case leading, center, trailing
     }
 }
 

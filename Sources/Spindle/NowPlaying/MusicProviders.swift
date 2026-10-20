@@ -1,6 +1,16 @@
 import AppKit
 import Foundation
 
+/// Read a number out of an AppleScript result.
+///
+/// AppleScript formats reals with the system's decimal separator, so on a
+/// machine set to a comma locale `player position` comes back as "12,345" and
+/// `Double()` refuses it. That silently became zero, which pinned the tonearm
+/// to the lead-in groove and held lyrics on the first line forever.
+func appleScriptNumber(_ text: String) -> Double? {
+    Double(text.replacingOccurrences(of: ",", with: "."))
+}
+
 /// A source Spindle can ask "what is playing?".
 protocol MusicProvider {
     var source: NowPlaying.Source { get }
@@ -9,6 +19,13 @@ protocol MusicProvider {
     func fetch() throws -> NowPlaying?
     /// Cover art for the current track, if the app will give it up.
     func artwork() throws -> NSImage?
+    /// Lyrics stored against the current track, if the app keeps any.
+    func lyrics() throws -> String?
+}
+
+extension MusicProvider {
+    /// Most sources have nothing to offer here.
+    func lyrics() throws -> String? { nil }
 }
 
 // MARK: - Spotify
@@ -46,15 +63,20 @@ struct SpotifyProvider: MusicProvider {
         let fields = text.components(separatedBy: "\n")
         guard fields.count >= 6 else { return nil }
         // Spotify reports track length in milliseconds.
-        let duration = (Double(fields[3]) ?? 0) / 1000.0
+        let duration = (appleScriptNumber(fields[3]) ?? 0) / 1000.0
         return NowPlaying(title: fields[0],
                           artist: fields[1],
                           album: fields[2],
                           duration: duration,
-                          position: Double(fields[4]) ?? 0,
+                          position: appleScriptNumber(fields[4]) ?? 0,
                           isPlaying: fields[5].lowercased().contains("playing"),
                           source: source)
     }
+
+    /// Spotify's scripting interface has no lyrics in it at all, so there is
+    /// nothing to ask for. Saying so here is better than an empty result that
+    /// looks like a track without lyrics.
+    func lyrics() throws -> String? { nil }
 
     func artwork() throws -> NSImage? {
         guard isRunning else { return nil }
@@ -88,6 +110,13 @@ struct AppleMusicProvider: MusicProvider {
     end tell
     """
 
+    private static let lyricsScript = """
+    tell application id "com.apple.Music"
+        if player state is stopped then return ""
+        return lyrics of current track
+    end tell
+    """
+
     private static let artworkScript = """
     tell application id "com.apple.Music"
         if player state is stopped then return missing value
@@ -107,10 +136,19 @@ struct AppleMusicProvider: MusicProvider {
         return NowPlaying(title: fields[0],
                           artist: fields[1],
                           album: fields[2],
-                          duration: Double(fields[3]) ?? 0,
-                          position: Double(fields[4]) ?? 0,
+                          duration: appleScriptNumber(fields[3]) ?? 0,
+                          position: appleScriptNumber(fields[4]) ?? 0,
                           isPlaying: fields[5].lowercased().contains("playing"),
                           source: source)
+    }
+
+    /// Whatever is stored against the track in your own library. Music keeps
+    /// this as plain text with no timings.
+    func lyrics() throws -> String? {
+        guard isRunning else { return nil }
+        let result = try bridge.run(Self.lyricsScript, cacheKey: "music.lyrics")
+        guard let text = result.stringValue, !text.isEmpty else { return nil }
+        return text
     }
 
     func artwork() throws -> NSImage? {
